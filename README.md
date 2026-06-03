@@ -25,7 +25,7 @@ cataract_dataset/
 pip install -r requirements.txt
 ```
 
-3. Open `model_training.ipynb`, update `DATASET_DIR` if needed, and run the notebook. It trains for 10 epochs without data augmentation and saves:
+3. Open `model_training.ipynb`, update `DATASET_DIR` if needed, and run the notebook. It trains for 10 epochs and saves:
 
 - `models/cataract_resnet50.keras`
 - `models/cataract_labels.json`
