@@ -2,17 +2,26 @@ from gemini_helper import generate_report
 from gemini_helper import ask_question
 
 # ==========================================
-# THESE VALUES WILL COME FROM YOUR MODEL
+# MODEL OUTPUT (TEMPORARY VALUES)
 # ==========================================
 
 prediction = "Signs Associated with Cataract Detected"
 confidence = 96.40
 
 # ==========================================
-# SYMPTOM SURVEY
+# WELCOME
 # ==========================================
 
-print("\nEYE HEALTH ASSESSMENT\n")
+print("\n" + "=" * 60)
+print("EYE HEALTH ASSESSMENT")
+print("=" * 60)
+
+print(f"\nPrediction: {prediction}")
+print(f"Confidence: {confidence}%")
+
+# ==========================================
+# SYMPTOM SURVEY
+# ==========================================
 
 questions = [
     "Blurred Vision",
@@ -24,15 +33,17 @@ questions = [
 
 symptoms = []
 
-for q in questions:
+print("\nPlease answer the following questions:")
 
-    ans = input(f"{q}? (yes/no): ")
+for question in questions:
 
-    if ans.lower() in ["yes", "y"]:
-        symptoms.append(q)
+    answer = input(f"\n{question}? (yes/no): ").strip().lower()
+
+    if answer in ["yes", "y"]:
+        symptoms.append(question)
 
 # ==========================================
-# FINAL REPORT
+# GENERATE SCREENING REPORT
 # ==========================================
 
 print("\nGenerating Report...\n")
@@ -54,7 +65,7 @@ print(report)
 # ==========================================
 
 print("\n" + "=" * 60)
-print("ASK ANY EYE-HEALTH QUESTION")
+print("EYECARE ASSISTANT")
 print("=" * 60)
 
 print("""
@@ -63,24 +74,32 @@ Examples:
 - What causes cataract?
 - Can cataract affect night vision?
 - How is cataract detected?
+- What do my results mean?
 
 Type 'exit' to quit.
 """)
 
 while True:
 
-    question = input("\nYou: ")
+    question = input("\nYou: ").strip()
 
     if question.lower() == "exit":
 
         print("\nThank you for using EyeCare Assistant.")
         break
 
-    answer = ask_question(
-        question,
-        prediction,
-        confidence
-    )
+    try:
 
-    print("\nBot:")
-    print(answer)yaml
+        answer = ask_question(
+            question,
+            prediction,
+            confidence
+        )
+
+        print("\nBot:")
+        print(answer)
+
+    except Exception as e:
+
+        print("\nError:")
+        print(e)

@@ -1,0 +1,24 @@
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.pyc
+
+# PyCharm
+.idea/
+
+# VS Code
+.vscode/
+
+# Virtual Environment
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Model files (optional)
+*.h5
+*.keras
+*.pkl
