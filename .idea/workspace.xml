@@ -4,7 +4,7 @@
     <option name="autoReloadType" value="ALL" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="1faf463e-b31f-4dfb-9585-b8b4eb0e022a" name="Changes" comment="" />
+    <list default="true" id="cd72365c-de20-4242-96c4-188d4b0e1745" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -16,29 +16,35 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
+  <component name="GithubPullRequestsUISettings"><![CDATA[{
+  "selectedUrlAndAccountId": {
+    "url": "https://github.com/detectorcataract/cataract_detector.git",
+    "accountId": "cb39a79e-ecec-4e75-bcf1-bbedd4d6d0b4"
+  }
+}]]></component>
   <component name="McpProjectServerCommands">
     <commands />
     <urls />
   </component>
   <component name="NextEditCompletionFeaturesState">
     <decayedCancelled>
-      <entry key="MS100" value="1.0089742065436336" />
-      <entry key="MS500" value="1.4091495562389909" />
-      <entry key="S2" value="3.4821471125099266" />
-      <entry key="S5" value="8.245263560645867" />
-      <entry key="S10" value="13.783764575717733" />
-      <entry key="S30" value="29.187564357626588" />
-      <entry key="S60" value="47.899780271914885" />
-      <entry key="M2" value="76.47561117419312" />
-      <entry key="M5" value="112.7727976664777" />
-      <entry key="M10" value="130.7740577340482" />
-      <entry key="M15" value="137.6657047417476" />
-      <entry key="M30" value="145.0612925899723" />
-      <entry key="H1" value="148.96018934498835" />
-      <entry key="H2" value="150.96214876184376" />
-      <entry key="H4" value="151.97654574967154" />
-      <entry key="D1" value="152.82879170443277" />
-      <entry key="W1" value="152.97552613282656" />
+      <entry key="MS100" value="1.2078822319361948" />
+      <entry key="MS500" value="3.79660631915513" />
+      <entry key="S2" value="7.032970832776229" />
+      <entry key="S5" value="8.6057853230751" />
+      <entry key="S10" value="11.851283434164465" />
+      <entry key="S30" value="26.969183877879868" />
+      <entry key="S60" value="46.666127686249666" />
+      <entry key="M2" value="76.84647777348384" />
+      <entry key="M5" value="116.50837357340167" />
+      <entry key="M10" value="136.68664327327556" />
+      <entry key="M15" value="144.49065621185161" />
+      <entry key="M30" value="152.91094179017816" />
+      <entry key="H1" value="157.36841868778626" />
+      <entry key="H2" value="159.6619983610754" />
+      <entry key="H4" value="160.82538941295357" />
+      <entry key="D1" value="161.80344754592417" />
+      <entry key="W1" value="161.97190181335208" />
     </decayedCancelled>
     <decayedSelected>
       <entry key="MS100" value="0.0" />
@@ -60,29 +66,29 @@
       <entry key="W1" value="0.0" />
     </decayedSelected>
     <decayedShown>
-      <entry key="MS100" value="0.07890976815595914" />
-      <entry key="MS500" value="0.9182258662987014" />
-      <entry key="S2" value="3.1505194404519123" />
-      <entry key="S5" value="7.986135791042542" />
-      <entry key="S10" value="13.60539766226495" />
-      <entry key="S30" value="29.10816879689923" />
-      <entry key="S60" value="47.85536374557536" />
-      <entry key="M2" value="76.45137551005784" />
-      <entry key="M5" value="112.76231466102142" />
-      <entry key="M10" value="130.76863945988748" />
-      <entry key="M15" value="137.6620487499989" />
-      <entry key="M30" value="145.05944141270854" />
-      <entry key="H1" value="148.9592577064688" />
-      <entry key="H2" value="150.96168139689988" />
-      <entry key="H4" value="151.9763116765367" />
-      <entry key="D1" value="152.8287526376205" />
-      <entry key="W1" value="152.97552055051094" />
+      <entry key="MS100" value="1.165703592174574" />
+      <entry key="MS500" value="3.762148835338828" />
+      <entry key="S2" value="7.0154272375209805" />
+      <entry key="S5" value="8.582851993462878" />
+      <entry key="S10" value="11.804326233592517" />
+      <entry key="S30" value="26.9184145886587" />
+      <entry key="S60" value="46.630385376260215" />
+      <entry key="M2" value="76.82459080109379" />
+      <entry key="M5" value="116.4982285905097" />
+      <entry key="M10" value="136.68127757571085" />
+      <entry key="M15" value="144.48700781608238" />
+      <entry key="M30" value="152.9090802373948" />
+      <entry key="H1" value="157.3674782290625" />
+      <entry key="H2" value="159.66152566627446" />
+      <entry key="H4" value="160.82515244346263" />
+      <entry key="D1" value="161.80340796411528" />
+      <entry key="W1" value="161.97189615667352" />
     </decayedShown>
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 3,
-  "fromUser": false
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 3,
+  &quot;fromUser&quot;: false
+}</component>
   <component name="ProjectId" id="3EqeVVrnVocwrw3ndM6EMdKpwFO" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
@@ -98,7 +104,6 @@
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "codeWithMe.voiceChat.enabledByDefault": "false",
     "com.intellij.ml.llm.matterhorn.ej.ui.settings.DefaultModelSelectionForGA.v1": "true",
-    "git-widget-placeholder": "main",
     "junie.onboarding.icon.badge.shown": "true",
     "last_opened_file_path": "/Users/roshan/code/cataract_detector",
     "node.js.detected.package.eslint": "true",
@@ -130,5 +135,8 @@
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/cataract_detector$predict.coverage" NAME="predict Coverage Results" MODIFIED="1780918683494" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src" />
   </component>
 </project>
