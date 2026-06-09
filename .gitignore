@@ -22,3 +22,6 @@ venv/
 *.h5
 *.keras
 *.pkl
+
+# User uploads
+uploads/
