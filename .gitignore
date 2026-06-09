@@ -1,6 +1,9 @@
-.idea/workspace.xml
-.idea/vcs.xml
-.idea/
 .venv
 .venv/
 .env
+.idea
+.idea/
+.ai
+.ai/
+.vscode
+__pycache__/
