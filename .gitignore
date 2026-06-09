@@ -6,3 +6,4 @@
 .ai
 .ai/
 .vscode
+__pycache__/
