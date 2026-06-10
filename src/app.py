@@ -11,19 +11,19 @@ from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 
-load_dotenv()
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 SRC_DIR = PROJECT_ROOT / "src"
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", PROJECT_ROOT / "uploads"))
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 MAX_CONTENT_LENGTH = 8 * 1024 * 1024
+load_dotenv(PROJECT_ROOT / ".env")
 
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from gemini_helper import ask_question, generate_report  # noqa: E402
-from predict import predict_cataract  # noqa: E402
+from predict import predict_cataract, PROJECT_ROOT  # noqa: E402
 
 # ── Extensions (db must be imported before auth) ───────────────────────────────
 from extensions import db  # noqa: E402
