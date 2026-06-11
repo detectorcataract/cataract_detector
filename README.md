@@ -11,7 +11,7 @@ cataract_dataset/
   train/
     cataract/
     normal/
-  validation/
+  valid/
     cataract/
     normal/
   test/
