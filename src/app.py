@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+from datetime import datetime, UTC
 import json
 import os
 import sys
@@ -11,74 +11,71 @@ from flask import Flask, jsonify, request, send_from_directory
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 
+from extensions import db
+from auth import auth_bp, token_required
+
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 SRC_DIR = PROJECT_ROOT / "src"
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", PROJECT_ROOT / "uploads"))
+load_dotenv(PROJECT_ROOT / ".env")
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 MAX_CONTENT_LENGTH = 8 * 1024 * 1024
-load_dotenv(PROJECT_ROOT / ".env")
 
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from gemini_helper import ask_question, generate_report  # noqa: E402
-from predict import predict_cataract, PROJECT_ROOT  # noqa: E402
+from predict import predict_cataract  # noqa: E402
 
-# ── Extensions (db must be imported before auth) ───────────────────────────────
-from extensions import db  # noqa: E402
-from auth import auth_bp, token_required  # noqa: E402
-
-
-# ── App factory ────────────────────────────────────────────────────────────────
 app = Flask(__name__)
 
-# Database
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL")
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
-# Upload size limit
 app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
 app.config["UPLOAD_FOLDER"] = str(UPLOAD_DIR)
 
-# Init extensions
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
+    "DATABASE_URL"
+)
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
 db.init_app(app)
 
-# Register auth blueprint — mounts /api/auth/register, /login, /logout, /me
 app.register_blueprint(auth_bp)
 
-# Create all DB tables (users table from auth.py) on first run
 with app.app_context():
     db.create_all()
 
-# In-memory cache for follow-up questions during local development
+# In-memory convenience cache for follow-up questions during local development.
 ANALYSES: dict[str, dict[str, Any]] = {}
+CHAT_SESSIONS: dict[str, dict[str, Any]] = {}
 
-
-# ── CORS ───────────────────────────────────────────────────────────────────────
 @app.after_request
 def add_cors_headers(response):
     response.headers["Access-Control-Allow-Origin"] = os.getenv("CORS_ORIGIN", "*")
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    response.headers["Access-Control-Allow-Headers"] = (
+        "Content-Type, Authorization"
+    )
     response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
     return response
 
 
-# ── Routes ─────────────────────────────────────────────────────────────────────
 @app.get("/")
 def index():
     return jsonify(
         {
             "message": "Cataract detector API is running.",
             "endpoints": {
-                "register": "POST /api/auth/register",
-                "login":    "POST /api/auth/login",
-                "logout":   "POST /api/auth/logout",
-                "me":       "GET  /api/auth/me",
-                "analyze":  "POST /api/analyze  [auth required]",
-                "chat":     "POST /api/chat     [auth required]",
-                "health":   "GET  /api/health",
-            },
+    "register": "POST /api/auth/register",
+    "login": "POST /api/auth/login",
+    "logout": "POST /api/auth/logout",
+    "me": "GET /api/auth/me",
+    "analyze": "POST /api/analyze",
+    "chat": "POST /api/chat",
+    "sessions": "GET /api/sessions",
+    "chat_history": "GET /api/chat-history/<session_id>",
+    "delete_session": "DELETE /api/sessions/<session_id>",
+    "health": "GET /api/health"
+}
         }
     )
 
@@ -89,8 +86,8 @@ def health():
 
 
 @app.post("/api/analyze")
-@token_required                          # 🔒 login required
-def analyze_image(current_user):         # current_user injected by decorator
+@token_required
+def analyze_image(current_user):
     if "image" not in request.files:
         return error_response("Please upload an image using the 'image' field.", 400)
 
@@ -112,14 +109,28 @@ def analyze_image(current_user):         # current_user injected by decorator
         prediction_result = predict_cataract(image_path)
         prediction = str(prediction_result["label"])
         confidence_percent = round(float(prediction_result["confidence"]) * 100, 2)
+        username = current_user.username
+
+        language = request.form.get(
+            "language",
+            "English"
+        )
+        report = generate_report(
+            username,
+            prediction,
+            confidence_percent,
+            symptoms,
+            language
+        )
         report = generate_report(prediction, confidence_percent, symptoms)
     except Exception as exc:
         return error_response(str(exc), 500)
 
     analysis_id = uuid.uuid4().hex
+    session_id = uuid.uuid4().hex
     analysis = {
         "analysis_id": analysis_id,
-        "user_id": current_user.id,        # tie analysis to logged-in user
+        "session_id": session_id,
         "image": {
             "filename": stored_filename,
             "url": f"/uploads/{stored_filename}",
@@ -131,46 +142,185 @@ def analyze_image(current_user):         # current_user injected by decorator
         "raw_prediction": prediction_result,
     }
     ANALYSES[analysis_id] = analysis
-
+    CHAT_SESSIONS[session_id] = {
+        "user_id": current_user.id,
+        "session_id": session_id,
+        "title": f"{username} - {datetime.now().strftime('%d-%m %H:%M')}",
+        "username": username,
+        "prediction": prediction,
+        "confidence": confidence_percent,
+        "report": report,
+        "language": language,
+        "created_at": datetime.now(UTC).isoformat(),
+        "messages": [
+    {
+        "role": "assistant",
+        "content": report,
+        "timestamp": datetime.now(UTC).isoformat()
+    }
+]
+    }
     return jsonify(analysis)
 
 
-@app.post("/api/chat")
-@token_required                          # 🔒 login required
-def chat(current_user):
-    payload = request.get_json(silent=True) or {}
-    question = str(payload.get("question", "")).strip()
-    if not question:
-        return error_response("Question is required.", 400)
-
-    prediction, confidence = get_chat_context(payload, current_user.id)
-    if prediction is None or confidence is None:
+@app.get("/api/chat-history/<session_id>")
+@token_required
+def get_chat_history(current_user, session_id):
+    if session_id not in CHAT_SESSIONS:
         return error_response(
-            "Send analysis_id from /api/analyze, or provide prediction and confidence.",
-            400,
+            "Invalid session_id.",
+            404
         )
 
-    try:
-        answer = ask_question(question, prediction, confidence)
-    except Exception as exc:
-        return error_response(str(exc), 500)
+    session = CHAT_SESSIONS[session_id]
+    if session["user_id"] != current_user.id:
+        return error_response(
+            "Unauthorized",
+            403
+        )
 
     return jsonify(
         {
-            "question": question,
-            "answer": answer,
-            "prediction": prediction,
-            "confidence": confidence,
+            "session_id": session_id,
+            "messages": session["messages"],
+            "prediction": session["prediction"],
+            "confidence": session["confidence"],
+            "report": session["report"]
+        }
+    )
+@app.delete("/api/sessions/<session_id>")
+@token_required
+def delete_session(current_user, session_id):
+
+    if session_id not in CHAT_SESSIONS:
+        return error_response(
+            "Invalid session_id.",
+            404
+        )
+
+    session = CHAT_SESSIONS[session_id]
+
+    if session["user_id"] != current_user.id:
+        return error_response(
+            "Unauthorized",
+            403
+        )
+
+    del CHAT_SESSIONS[session_id]
+
+    return jsonify(
+        {
+            "message": "Session deleted successfully."
+        }
+    )
+@app.post("/api/chat")
+@token_required
+def chat(current_user):
+    payload = request.get_json(silent=True) or {}
+
+    question = str(
+        payload.get("question", "")
+    ).strip()
+
+    session_id = str(
+        payload.get("session_id", "")
+    ).strip()
+
+    if not question:
+        return error_response(
+            "Question is required.",
+            400
+        )
+
+    if session_id not in CHAT_SESSIONS:
+        return error_response(
+            "Invalid session_id.",
+            400
+        )
+
+    session = CHAT_SESSIONS[session_id]
+
+    if session["user_id"] != current_user.id:
+        return error_response(
+            "Unauthorized",
+            403
+        )
+
+    prediction = session["prediction"]
+    confidence = session["confidence"]
+
+    session["messages"].append(
+        {
+            "role": "user",
+            "content": question,
+            "timestamp": datetime.now(UTC).isoformat()
         }
     )
 
+    try:
 
+        recent_messages = session["messages"][-20:]
+
+        answer = ask_question(
+            question,
+            prediction,
+            confidence,
+            session["language"],
+            recent_messages
+        )
+
+        session["messages"].append(
+            {
+                "role": "assistant",
+                "content": answer,
+                "timestamp": datetime.now(UTC).isoformat()
+            }
+        )
+
+    except Exception as exc:
+        return error_response(
+            str(exc),
+            500
+        )
+
+    return jsonify(
+        {
+            "session_id": session["session_id"],
+            "title": session["title"],
+            "username": session["username"],
+            "created_at": session["created_at"],
+            "prediction": session["prediction"],
+            "confidence": session["confidence"],
+            "report": session["report"],
+            "messages": session["messages"]
+        }
+    )
+@app.get("/api/sessions")
+@token_required
+def get_sessions(current_user):
+
+    sessions = []
+
+    for session in CHAT_SESSIONS.values():
+
+        if session["user_id"] != current_user.id:
+            continue
+        sessions.append(
+            {
+                "session_id": session["session_id"],
+                "title": session["title"],
+                "prediction": session["prediction"],
+                "confidence": session["confidence"],
+                "created_at": session["created_at"]
+            }
+        )
+
+    return jsonify(sessions)
 @app.get("/uploads/<path:filename>")
 def uploaded_file(filename: str):
     return send_from_directory(UPLOAD_DIR, filename)
 
 
-# ── Error handlers ─────────────────────────────────────────────────────────────
 @app.errorhandler(413)
 def file_too_large(_error):
     return error_response("Uploaded image is too large. Maximum size is 8 MB.", 413)
@@ -181,7 +331,6 @@ def not_found(_error):
     return error_response("Route not found.", 404)
 
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
 def is_allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -208,13 +357,10 @@ def parse_symptoms(repeated_values: list[str], raw_value: str | None) -> list[st
     return [value.strip() for value in values if value and value.strip()]
 
 
-def get_chat_context(payload: dict[str, Any], user_id: int) -> tuple[str | None, float | None]:
+def get_chat_context(payload: dict[str, Any]) -> tuple[str | None, float | None]:
     analysis_id = payload.get("analysis_id")
     if analysis_id and analysis_id in ANALYSES:
         analysis = ANALYSES[str(analysis_id)]
-        # Make sure the analysis belongs to the requesting user
-        if analysis.get("user_id") != user_id:
-            return None, None
         return str(analysis["prediction"]), float(analysis["confidence"])
 
     prediction = payload.get("prediction")
@@ -238,7 +384,6 @@ def error_response(message: str, status_code: int):
     return response
 
 
-# ── Entry point ────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     app.run(host=os.getenv("FLASK_HOST", "0.0.0.0"), port=int(os.getenv("PORT", "5000")))
