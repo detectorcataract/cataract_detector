@@ -165,6 +165,8 @@ def login():
     })
 
 
+
+
 @auth_bp.post("/logout")
 @token_required
 def logout(current_user):
@@ -188,3 +190,4 @@ def me(current_user):
     Returns the currently authenticated user's info.
     """
     return jsonify({"user": current_user.to_dict()})
+

@@ -122,6 +122,7 @@ def analyze_image(current_user):
             symptoms,
             language
         )
+        report = generate_report(prediction, confidence_percent, symptoms)
     except Exception as exc:
         return error_response(str(exc), 500)
 
