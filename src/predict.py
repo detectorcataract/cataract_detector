@@ -36,7 +36,7 @@ def predict_cataract(
     mobilenetv2_model_path: str | Path = DEFAULT_MOBILENETV2_MODEL_PATH,
     labels_path: str | Path = DEFAULT_LABELS_PATH,
     *,
-    resnet50_preprocessing: PreprocessingMode = "embedded",
+    resnet50_preprocessing: PreprocessingMode = "resnet50",
     mobilenetv2_preprocessing: PreprocessingMode = "embedded",
 ) -> dict[str, Any]:
 
@@ -173,3 +173,7 @@ def _probability_map(labels: list[str], probabilities: np.ndarray) -> dict[str, 
 
 # Backwards-compatible alias for callers that expect a generic predict function.
 predict = predict_cataract
+
+result = predict_cataract(Path("/Users/roshan/Downloads/sample.jpeg"))
+
+print(result)
