@@ -37,7 +37,7 @@ def predict_cataract(
     labels_path: str | Path = DEFAULT_LABELS_PATH,
     *,
     resnet50_preprocessing: PreprocessingMode = "resnet50",
-    mobilenetv2_preprocessing: PreprocessingMode = "embedded",
+    mobilenetv2_preprocessing: PreprocessingMode = "none",
 ) -> dict[str, Any]:
 
     labels = _load_labels(Path(labels_path))
@@ -89,13 +89,18 @@ def _load_labels(labels_path: Path) -> list[str]:
     return [str(label) for label in labels]
 
 
-def _load_image_batch(
-    image: str | Path | bytes | bytearray | Image.Image | np.ndarray,
-) -> np.ndarray:
-    pil_image = _to_pil_image(image).convert("RGB")
-    pil_image = pil_image.resize(IMG_SIZE, Image.Resampling.BILINEAR)
-    array = keras.utils.img_to_array(pil_image, dtype="float32")
-    return np.expand_dims(array, axis=0)
+def _load_image_batch(image: str | Path) -> np.ndarray:
+    img = keras.utils.load_img(
+        image,
+        target_size=IMG_SIZE
+    )
+
+    arr = keras.utils.img_to_array(
+        img,
+        dtype="float32"
+    )
+
+    return np.expand_dims(arr, axis=0)
 
 
 def _to_pil_image(image: str | Path | bytes | bytearray | Image.Image | np.ndarray) -> Image.Image:
