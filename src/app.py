@@ -216,12 +216,20 @@ def delete_session(current_user, session_id):
 @token_required
 def chat(current_user):
     payload = request.get_json(silent=True) or {}
-    question = str(payload.get("question", "")).strip()
+
+    question = str(
+        payload.get("question", "")
+    ).strip()
+
     session_id = str(
         payload.get("session_id", "")
     ).strip()
+
     if not question:
-        return error_response("Question is required.", 400)
+        return error_response(
+            "Question is required.",
+            400
+        )
 
     if session_id not in CHAT_SESSIONS:
         return error_response(
@@ -230,6 +238,7 @@ def chat(current_user):
         )
 
     session = CHAT_SESSIONS[session_id]
+
     if session["user_id"] != current_user.id:
         return error_response(
             "Unauthorized",
@@ -238,7 +247,7 @@ def chat(current_user):
 
     prediction = session["prediction"]
     confidence = session["confidence"]
-    report = session["report"]
+
     session["messages"].append(
         {
             "role": "user",
@@ -246,17 +255,19 @@ def chat(current_user):
             "timestamp": datetime.now(UTC).isoformat()
         }
     )
+
     try:
+
         recent_messages = session["messages"][-20:]
 
         answer = ask_question(
             question,
             prediction,
             confidence,
-            report,
             session["language"],
             recent_messages
         )
+
         session["messages"].append(
             {
                 "role": "assistant",
@@ -264,12 +275,16 @@ def chat(current_user):
                 "timestamp": datetime.now(UTC).isoformat()
             }
         )
+
     except Exception as exc:
-        return error_response(str(exc), 500)
+        return error_response(
+            str(exc),
+            500
+        )
 
     return jsonify(
         {
-            "session_id": session_id,
+            "session_id": session["session_id"],
             "title": session["title"],
             "username": session["username"],
             "created_at": session["created_at"],
@@ -279,7 +294,6 @@ def chat(current_user):
             "messages": session["messages"]
         }
     )
-
 @app.get("/api/sessions")
 @token_required
 def get_sessions(current_user):
