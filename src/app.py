@@ -12,8 +12,7 @@ from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 
 from extensions import db
-from auth import auth_bp, token_required
-
+from auth import auth_bp, token_required, User, ChatSession, ChatMessage
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 SRC_DIR = PROJECT_ROOT / "src"
@@ -109,7 +108,7 @@ def analyze_image(current_user):
         prediction_result = predict_cataract(image_path)
         prediction = str(prediction_result["label"])
         confidence_percent = round(float(prediction_result["confidence"]) * 100, 2)
-        username = current_user.username
+        username = current_user.email
 
         language = request.form.get(
             "language",
@@ -122,12 +121,33 @@ def analyze_image(current_user):
             symptoms,
             language
         )
-        report = generate_report(prediction, confidence_percent, symptoms)
     except Exception as exc:
         return error_response(str(exc), 500)
 
     analysis_id = uuid.uuid4().hex
     session_id = uuid.uuid4().hex
+
+    chat_session = ChatSession(
+        session_id=session_id,
+        user_id=current_user.id,
+        title=f"{username} - {datetime.now().strftime('%d-%m %H:%M')}",
+        prediction=prediction,
+        confidence=confidence_percent,
+        report=report,
+        language=language,
+    )
+
+    db.session.add(chat_session)
+    db.session.commit()
+
+    first_message = ChatMessage(
+        session_id=chat_session.id,
+        role="assistant",
+        content=report,
+    )
+
+    db.session.add(first_message)
+    db.session.commit()
     analysis = {
         "analysis_id": analysis_id,
         "session_id": session_id,
@@ -142,6 +162,7 @@ def analyze_image(current_user):
         "raw_prediction": prediction_result,
     }
     ANALYSES[analysis_id] = analysis
+
     CHAT_SESSIONS[session_id] = {
         "user_id": current_user.id,
         "session_id": session_id,
@@ -232,6 +253,8 @@ def chat(current_user):
             400
         )
 
+
+
     if session_id not in CHAT_SESSIONS:
         return error_response(
             "Invalid session_id.",
@@ -239,6 +262,16 @@ def chat(current_user):
         )
 
     session = CHAT_SESSIONS[session_id]
+
+    chat_session = ChatSession.query.filter_by(
+        session_id=session_id
+    ).first()
+
+    if chat_session is None:
+        return error_response(
+            "Chat session not found in database.",
+            404
+        )
 
     if session["user_id"] != current_user.id:
         return error_response(
@@ -256,6 +289,14 @@ def chat(current_user):
             "timestamp": datetime.now(UTC).isoformat()
         }
     )
+
+    user_message = ChatMessage(
+        session_id=chat_session.id,
+        role="user",
+        content=question,
+    )
+
+    db.session.add(user_message)
 
     try:
 
@@ -277,14 +318,28 @@ def chat(current_user):
             }
         )
 
+        assistant_message = ChatMessage(
+            session_id=chat_session.id,
+            role="assistant",
+            content=answer,
+        )
+
+        db.session.add(assistant_message)
+        db.session.commit()
+
+
     except Exception as exc:
+        db.session.rollback()
         return error_response(
             str(exc),
             500
         )
 
+    db.session.commit()
+
     return jsonify(
         {
+            "answer": answer,
             "session_id": session["session_id"],
             "title": session["title"],
             "username": session["username"],
