@@ -48,6 +48,52 @@ class User(db.Model):
         return {"id": self.id, "email": self.email, "created_at": str(self.created_at)}
 
 
+class ChatSession(db.Model):
+    __tablename__ = "chat_sessions"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    session_id = db.Column(db.String(64), unique=True, nullable=False)
+
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id"),
+        nullable=False
+    )
+
+    title = db.Column(db.String(255))
+    prediction = db.Column(db.String(100))
+    confidence = db.Column(db.Float)
+    language = db.Column(db.String(50))
+    report = db.Column(db.Text)
+
+    created_at = db.Column(
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc)
+    )
+
+
+class ChatMessage(db.Model):
+    __tablename__ = "chat_messages"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    session_id = db.Column(
+        db.Integer,
+        db.ForeignKey("chat_sessions.id"),
+        nullable=False
+    )
+
+    role = db.Column(db.String(20))
+    content = db.Column(db.Text)
+
+    timestamp = db.Column(
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc)
+    )
+
+
+
 # ── JWT helpers ────────────────────────────────────────────────────────────────
 
 def generate_token(user_id: int) -> str:
