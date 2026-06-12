@@ -601,6 +601,7 @@ function ChatScreen({ user, onLogout }) {
 
       setAnalysisCtx({
         analysis_id: data.analysis_id,
+        session_id: data.session_id,
         prediction: data.prediction,
         confidence: data.confidence,
       });
@@ -641,7 +642,7 @@ function ChatScreen({ user, onLogout }) {
       const data = await apiFetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, analysis_id: analysisCtx.analysis_id }),
+        body: JSON.stringify({ question, session_id: analysisCtx.session_id}),
       });
       addMessage({ role: "bot", text: data.answer });
     } catch (err) {
