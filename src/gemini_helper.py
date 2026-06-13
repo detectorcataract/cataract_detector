@@ -234,13 +234,13 @@ def ask_question(
 
         Screening Result:
         {prediction}
-        
+
         Confidence:
         {confidence}%
-                   
+
         Conversation History:
         {history_text}
-        
+
         User Question:
         {question}
 

@@ -7,7 +7,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory, url_for
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 
@@ -46,7 +46,6 @@ with app.app_context():
 
 # In-memory convenience cache for follow-up questions during local development.
 ANALYSES: dict[str, dict[str, Any]] = {}
-CHAT_SESSIONS: dict[str, dict[str, Any]] = {}
 
 @app.after_request
 def add_cors_headers(response):
@@ -135,19 +134,16 @@ def analyze_image(current_user):
         confidence=confidence_percent,
         report=report,
         language=language,
+        image_url=url_for(
+            "uploaded_file",
+            filename=stored_filename,
+            _external=True
+        ),
     )
 
     db.session.add(chat_session)
     db.session.commit()
 
-    first_message = ChatMessage(
-        session_id=chat_session.id,
-        role="assistant",
-        content=report,
-    )
-
-    db.session.add(first_message)
-    db.session.commit()
     analysis = {
         "analysis_id": analysis_id,
         "session_id": session_id,
@@ -163,71 +159,70 @@ def analyze_image(current_user):
     }
     ANALYSES[analysis_id] = analysis
 
-    CHAT_SESSIONS[session_id] = {
-        "user_id": current_user.id,
-        "session_id": session_id,
-        "title": f"{username} - {datetime.now().strftime('%d-%m %H:%M')}",
-        "username": username,
-        "prediction": prediction,
-        "confidence": confidence_percent,
-        "report": report,
-        "language": language,
-        "created_at": datetime.now(UTC).isoformat(),
-        "messages": [
-    {
-        "role": "assistant",
-        "content": report,
-        "timestamp": datetime.now(UTC).isoformat()
-    }
-]
-    }
     return jsonify(analysis)
 
 
 @app.get("/api/chat-history/<session_id>")
 @token_required
 def get_chat_history(current_user, session_id):
-    if session_id not in CHAT_SESSIONS:
+
+    session = ChatSession.query.filter_by(
+        session_id=session_id,
+        user_id=current_user.id
+    ).first()
+
+    if not session:
         return error_response(
             "Invalid session_id.",
             404
         )
 
-    session = CHAT_SESSIONS[session_id]
-    if session["user_id"] != current_user.id:
-        return error_response(
-            "Unauthorized",
-            403
-        )
+    messages = (
+        ChatMessage.query
+        .filter_by(session_id=session.id)
+        .order_by(ChatMessage.id.asc())
+        .all()
+    )
 
     return jsonify(
         {
-            "session_id": session_id,
-            "messages": session["messages"],
-            "prediction": session["prediction"],
-            "confidence": session["confidence"],
-            "report": session["report"]
+            "session_id": session.session_id,
+            "prediction": session.prediction,
+            "confidence": session.confidence,
+            "report": session.report,
+            "image_url": session.image_url,
+            "messages": [
+                {
+                    "role": m.role,
+                    "content": m.content,
+                    "timestamp": m.timestamp.isoformat()
+                }
+                for m in messages
+            ]
         }
     )
 @app.delete("/api/sessions/<session_id>")
 @token_required
 def delete_session(current_user, session_id):
 
-    if session_id not in CHAT_SESSIONS:
+    chat_session = ChatSession.query.filter_by(
+        session_id=session_id
+    ).first()
+
+    if chat_session is None:
         return error_response(
-            "Invalid session_id.",
+            "Session not found.",
             404
         )
 
-    session = CHAT_SESSIONS[session_id]
-
-    if session["user_id"] != current_user.id:
+    if chat_session.user_id != current_user.id:
         return error_response(
             "Unauthorized",
             403
         )
 
-    del CHAT_SESSIONS[session_id]
+    db.session.delete(chat_session)
+    db.session.commit()
 
     return jsonify(
         {
@@ -253,16 +248,6 @@ def chat(current_user):
             400
         )
 
-
-
-    if session_id not in CHAT_SESSIONS:
-        return error_response(
-            "Invalid session_id.",
-            400
-        )
-
-    session = CHAT_SESSIONS[session_id]
-
     chat_session = ChatSession.query.filter_by(
         session_id=session_id
     ).first()
@@ -273,22 +258,14 @@ def chat(current_user):
             404
         )
 
-    if session["user_id"] != current_user.id:
+    if chat_session.user_id != current_user.id:
         return error_response(
             "Unauthorized",
             403
         )
 
-    prediction = session["prediction"]
-    confidence = session["confidence"]
-
-    session["messages"].append(
-        {
-            "role": "user",
-            "content": question,
-            "timestamp": datetime.now(UTC).isoformat()
-        }
-    )
+    prediction = chat_session.prediction
+    confidence = chat_session.confidence
 
     user_message = ChatMessage(
         session_id=chat_session.id,
@@ -299,23 +276,21 @@ def chat(current_user):
     db.session.add(user_message)
 
     try:
-
-        recent_messages = session["messages"][-20:]
+        recent_messages = [
+            {
+                "role": msg.role,
+                "content": msg.content,
+                "timestamp": msg.timestamp.isoformat()
+            }
+            for msg in chat_session.messages
+        ][-20:]
 
         answer = ask_question(
             question,
             prediction,
             confidence,
-            session["language"],
+            chat_session.language,
             recent_messages
-        )
-
-        session["messages"].append(
-            {
-                "role": "assistant",
-                "content": answer,
-                "timestamp": datetime.now(UTC).isoformat()
-            }
         )
 
         assistant_message = ChatMessage(
@@ -340,37 +315,43 @@ def chat(current_user):
     return jsonify(
         {
             "answer": answer,
-            "session_id": session["session_id"],
-            "title": session["title"],
-            "username": session["username"],
-            "created_at": session["created_at"],
-            "prediction": session["prediction"],
-            "confidence": session["confidence"],
-            "report": session["report"],
-            "messages": session["messages"]
+            "session_id": chat_session.session_id,
+            "title": chat_session.title,
+            "created_at": chat_session.created_at.isoformat(),
+            "prediction": chat_session.prediction,
+            "confidence": chat_session.confidence,
+            "report": chat_session.report,
+            "messages": [
+                {
+                    "role": msg.role,
+                    "content": msg.content,
+                    "timestamp": msg.timestamp.isoformat()
+                }
+                for msg in chat_session.messages
+            ]
         }
     )
 @app.get("/api/sessions")
 @token_required
 def get_sessions(current_user):
 
-    sessions = []
+    sessions = (
+        ChatSession.query
+        .filter_by(user_id=current_user.id)
+        .order_by(ChatSession.created_at.desc())
+        .all()
+    )
 
-    for session in CHAT_SESSIONS.values():
-
-        if session["user_id"] != current_user.id:
-            continue
-        sessions.append(
-            {
-                "session_id": session["session_id"],
-                "title": session["title"],
-                "prediction": session["prediction"],
-                "confidence": session["confidence"],
-                "created_at": session["created_at"]
-            }
-        )
-
-    return jsonify(sessions)
+    return jsonify([
+        {
+            "session_id": s.session_id,
+            "title": s.title,
+            "prediction": s.prediction,
+            "confidence": s.confidence,
+            "created_at": s.created_at.isoformat(),
+        }
+        for s in sessions
+    ])
 @app.get("/uploads/<path:filename>")
 def uploaded_file(filename: str):
     return send_from_directory(UPLOAD_DIR, filename)
