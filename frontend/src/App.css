@@ -182,3 +182,39 @@
     border-right-color: var(--border);
   }
 }
+
+.main-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.session-sidebar {
+  width: 260px;
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-right: 1px solid #ddd;
+  overflow-y: auto;
+}
+
+.session-header {
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.session-item {
+  width: 100%;
+  text-align: left;
+  margin-bottom: 8px;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.session-item.active {
+  font-weight: bold;
+}

@@ -146,10 +146,8 @@ const styles = `
     display: flex;
     flex-direction: column;
     height: 100vh;
-    max-width: 760px;
-    margin: 0 auto;
+    width: 100%;
     background: #fff;
-    box-shadow: 0 0 40px rgba(100,149,237,0.08);
   }
 
   /* ── Header ── */
@@ -213,11 +211,19 @@ const styles = `
     flex-direction: column;
     gap: 16px;
     scroll-behavior: smooth;
+    scrollbar-gutter: stable;
   }
 
-  .messages::-webkit-scrollbar { width: 4px; }
+  .messages-inner {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding : 0 36px;
+  }
+
+  .messages::-webkit-scrollbar { width: 10px; }
   .messages::-webkit-scrollbar-track { background: transparent; }
-  .messages::-webkit-scrollbar-thumb { background: #bdd7ff; border-radius: 4px; }
+  .messages::-webkit-scrollbar-thumb { background: #bdd7ff; border-radius: 10px; }
 
   /* ── Bubble ── */
   .bubble-row {
@@ -283,6 +289,8 @@ const styles = `
     line-height: 1.7;
     color: #374151;
     white-space: pre-wrap;
+    text-align: left;
+
   }
 
   .report-label {
@@ -422,6 +430,82 @@ const styles = `
     padding: 6px 24px 14px;
     flex-shrink: 0;
   }
+
+  .main-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.session-sidebar {
+  width: 280px;
+  min-width: 280px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  padding: 12px;
+  border-right: 1px solid #e8f0fe;
+
+  overflow-y: auto;
+  background: #fafcff;
+
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: #bdd7ff transparent;
+}
+
+.session-sidebar::-webkit-scrollbar {
+  width: 10px;
+}
+
+.session-sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.session-sidebar::-webkit-scrollbar-thumb {
+  background: #bdd7ff;
+  border-radius: 10px;
+}
+
+.session-header {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.session-item {
+  color: #1a1a2e;
+  width: 100%;
+
+  padding: 10px 12px;
+
+  border: 1px solid #e8f0fe;
+  border-radius: 10px;
+
+  background: white;
+  cursor: pointer;
+
+  text-align: left;
+
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.session-item:hover {
+  background: #f0f6ff;
+}
+
+.session-item.active {
+  border-color: #bdd7ff;
+  background: #f0f6ff;
+}
+
+.session-item small {
+  color: #6b7280;
+}
+  
 `;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -572,10 +656,72 @@ function ChatScreen({ user, onLogout }) {
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sessions, setSessions] = useState([]);
   const [analysisCtx, setAnalysisCtx] = useState(null); // { analysis_id, prediction, confidence }
   const fileRef = useRef(null);
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
+  const [activeSession, setActiveSession] = useState(null);
+
+  async function loadLatestSession() {
+    try {
+
+
+        const sessions = await apiFetch("/api/sessions");
+
+        setSessions(sessions);
+
+        if (!sessions.length) return;
+
+        await loadSession(
+            sessions[0].session_id
+        );
+
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+  async function loadSession(sessionId) {
+    try {
+        const history = await apiFetch(
+            `/api/chat-history/${sessionId}`
+        );
+
+        setActiveSession(sessionId);
+
+        setAnalysisCtx({
+            session_id: history.session_id,
+            prediction: history.prediction,
+            confidence: history.confidence,
+        });
+
+
+        const restoredMessages = [
+            {
+                role: "bot",
+                text: "I've analysed your image. Here's the screening report:",
+                report: history.report,
+                prediction: history.prediction,
+                confidence: history.confidence,
+                imageUrl: history.image_url,
+            },
+            ...history.messages.map(msg => ({
+                role: msg.role === "assistant" ? "bot" : "user",
+                text: msg.content,
+            })),
+        ];
+
+        setMessages(restoredMessages);
+
+    } catch (err) {
+        console.error(err);
+    }
+  }
+
+  useEffect(() => {
+  loadLatestSession();
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -679,12 +825,48 @@ function ChatScreen({ user, onLogout }) {
       </div>
 
       {/* Messages */}
-      <div className="messages">
-        {messages.map((msg, i) => <Message key={i} msg={msg} />)}
-        {loading && <TypingBubble />}
-        <div ref={bottomRef} />
+      <div className="main-content">
+
+          {/* Session Sidebar */}
+          <div className="session-sidebar">
+          <div className="session-header">
+          Previous Sessions
       </div>
 
+      {sessions.map(session => (
+      <button
+        key={session.session_id}
+        className={
+          activeSession === session.session_id
+            ? "session-item active"
+            : "session-item"
+        }
+        onClick={() => loadSession(session.session_id)}
+      >
+          <div>
+            {session.title || "Untitled Session"}
+          </div>
+          <small>
+          {session.prediction}
+        </small>
+        </button>
+        ))}
+        </div>
+
+        {/* Messages */}
+        <div className="messages">
+          <div className="messages-inner">
+          {messages.map((msg, i) => (
+          <Message key={i} msg={msg} />
+          ))}
+          {loading && <TypingBubble />}
+          <div ref={bottomRef} />
+          </div>
+
+          </div>
+
+        </div>
+  
       {/* Disclaimer */}
       <div className="disclaimer">
         For screening and educational purposes only. Always consult an ophthalmologist.
