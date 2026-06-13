@@ -66,10 +66,19 @@ class ChatSession(db.Model):
     confidence = db.Column(db.Float)
     language = db.Column(db.String(50))
     report = db.Column(db.Text)
+    image_url = db.Column(db.String(500))
 
     created_at = db.Column(
         db.DateTime,
         default=lambda: datetime.now(timezone.utc)
+
+    )
+
+    messages = db.relationship(
+        "ChatMessage",
+        backref="chat_session",
+        lazy=True,
+        cascade="all, delete-orphan"
     )
 
 
