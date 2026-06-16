@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API = import.meta.env.VITE_API_URL
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
@@ -31,6 +31,11 @@ const styles = `
     max-width: 400px;
     box-shadow: 0 4px 24px rgba(100,149,237,0.10);
   }
+
+  .auth-card input {
+  color: #1f2937;
+  caret-color: #1f2937;
+}
 
   .auth-logo {
     display: flex;
@@ -218,7 +223,7 @@ const styles = `
   width: 100%;
   max-width: 1100px;
   margin: 0 auto;
-  padding : 0 36px;
+  padding : 0 32px;
   }
 
   .messages::-webkit-scrollbar { width: 10px; }
@@ -350,6 +355,7 @@ const styles = `
     font-size: 14px;
     padding: 40px 24px;
     text-align: center;
+    padding-top: 20vh;
   }
 
   .upload-prompt-icon {
@@ -382,6 +388,8 @@ const styles = `
     line-height: 1.5;
     transition: border-color 0.15s;
     background: #fff;
+    color: #1f2937;
+    caret-color: #1f2937;
   }
 
   .input-bar textarea:focus { border-color: #bdd7ff; }
@@ -404,21 +412,6 @@ const styles = `
   .btn-send:hover { background: #a3c8ff; }
   .btn-send:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  .btn-upload {
-    width: 42px;
-    height: 42px;
-    background: #f0f6ff;
-    border: 1.5px solid #bdd7ff;
-    border-radius: 12px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    transition: background 0.15s;
-    color: #3b82f6;
-    font-size: 18px;
-  }
 
   .btn-upload:hover { background: #bdd7ff; }
   .btn-upload:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -473,6 +466,44 @@ const styles = `
   font-weight: 600;
   margin-bottom: 10px;
 }
+.new-chat-btn {
+  width: 100%;
+
+  padding: 10px 12px;
+
+  border: none;
+  border-radius: 10px;
+
+  background: #bdd7ff;
+  color: #1a1a2e;
+
+  font-size: 13px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  margin-bottom: 12px;
+
+  transition: all 0.2s ease;
+}
+
+.new-chat-btn:hover {
+  background: #a3c8ff;
+}
+.search-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e8f0fe;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  outline: none;
+  background: white;
+}
+
+.search-input:focus {
+  border-color: #bdd7ff;
+}
 
 .session-item {
   color: #1a1a2e;
@@ -505,10 +536,41 @@ const styles = `
 .session-item small {
   color: #6b7280;
 }
-  
+
+.chat-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 `;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+const MAX_FILE_SIZE_MB = 8;
+
+const ALLOWED_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp"
+];
+
+function validateImageFile(file) {
+
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    return "Only JPG, PNG, and WebP images are supported.";
+  }
+
+  if (
+    file.size >
+    MAX_FILE_SIZE_MB * 1024 * 1024
+  ) {
+    return `Image must be smaller than ${MAX_FILE_SIZE_MB}MB.`;
+  }
+
+  return null;
+}
 
 function saveToken(t) { localStorage.setItem("eyecare_token", t); }
 function getToken() { return localStorage.getItem("eyecare_token"); }
@@ -524,8 +586,19 @@ async function apiFetch(path, options = {}) {
     },
   });
   const data = await res.json();
+
   if (!res.ok) throw new Error(data.error || "Something went wrong.");
   return data;
+}
+
+async function fetchProtectedImage(url) {
+  const token = getToken();
+  const res = await fetch(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) return null;
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
 }
 
 // ── Auth Screen ───────────────────────────────────────────────────────────────
@@ -565,7 +638,7 @@ function AuthScreen({ onAuth }) {
       <div className="auth-card">
         <div className="auth-logo">
           <div className="auth-logo-icon">👁️</div>
-          <span className="auth-logo-text">EyeCare Assistant</span>
+          <span className="auth-logo-text">EyeScan Assistant</span>
         </div>
         <div className="auth-title">{mode === "login" ? "Welcome back" : "Create account"}</div>
         <div className="auth-sub">
@@ -625,11 +698,40 @@ function TypingBubble() {
 
 function Message({ msg }) {
   const isBot = msg.role === "bot";
+  const [imgSrc, setImgSrc] = useState(null);
+
+  useEffect(() => {
+    if (!msg.imageUrl) return;
+
+    if (msg.imageUrl.startsWith("blob:")) {
+      setImgSrc(msg.imageUrl);
+      return;
+    }
+
+    let cancelled = false;
+    let objectUrl = null;
+
+    fetchProtectedImage(msg.imageUrl).then(src => {
+      if (cancelled) {
+        // Component unmounted before fetch resolved — clean up immediately
+        if (src) URL.revokeObjectURL(src);
+        return;
+      }
+      objectUrl = src;
+      if (src) setImgSrc(src);
+    });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [msg.imageUrl]);
+
   return (
     <div className={`bubble-row ${msg.role}`}>
       <div className={`avatar ${msg.role}`}>{isBot ? "👁" : "U"}</div>
       <div className={`bubble ${msg.role}`}>
-        {msg.imageUrl && <img src={msg.imageUrl} alt="uploaded eye" className="bubble-img" />}
+        {imgSrc && <img src={imgSrc} alt="uploaded eye" className="bubble-img" />}
         {msg.text}
         {msg.report && (
           <div className="report-card">
@@ -648,80 +750,110 @@ function Message({ msg }) {
 // ── Main Chat ─────────────────────────────────────────────────────────────────
 
 function ChatScreen({ user, onLogout }) {
-  const [messages, setMessages] = useState([
-    {
-      role: "bot",
-      text: `Hi ${user.email.split("@")[0]}! I'm your EyeCare Assistant.\n\nUpload an eye image to begin screening. I'll analyse it and answer any questions you have.`,
-    },
-  ]);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [sessions, setSessions] = useState([]);
   const [analysisCtx, setAnalysisCtx] = useState(null); // { analysis_id, prediction, confidence }
+  const [assessmentMode, setAssessmentMode] = useState(false);
+  const [flowStep, setFlowStep] = useState("upload");
+  const [patientName, setPatientName] = useState("");
+  const [selectedLanguage, setSelectedLanguage] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const fileRef = useRef(null);
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
   const [activeSession, setActiveSession] = useState(null);
 
-  async function loadLatestSession() {
-    try {
+  async function loadSession(sessionId) {
+  try {
+    setMessages([]);        // clear immediately
+    setAnalysisCtx(null);  // clear image context
+    setFlowStep("upload"); // force upload state while loading
 
+    const history = await apiFetch(`/api/chat-history/${sessionId}`);
 
-        const sessions = await apiFetch("/api/sessions");
+    setActiveSession(sessionId);
+    setAnalysisCtx({
+      session_id: history.session_id,
+      prediction: history.prediction,
+      confidence: history.confidence,
+    });
 
-        setSessions(sessions);
+    // Simple 1:1 mapping — no manual prepend, no imageUrl injection
+    const restoredMessages = history.messages.map((msg, index) => ({
+      role: msg.role === "assistant" ? "bot" : "user",
+      text: msg.content,
+      // attach image only to first assistant message (the greeting stored in DB)
+      ...(index === 0 && msg.role === "assistant" && history.image_url
+        ? { imageUrl: history.image_url }
+        : {}),
+    }));
 
-        if (!sessions.length) return;
+    setMessages(restoredMessages);
 
-        await loadSession(
-            sessions[0].session_id
-        );
-
-    } catch (err) {
-        console.error(err);
+    if (!history.patient_name) {
+      setFlowStep("name");
+      return;
     }
+    if (!history.language) {
+      setFlowStep("language");
+      return;
+    }
+    if (!history.assessment_completed) {
+      setAssessmentMode(true);
+      setFlowStep("assessment");
+      return;
+    }
+
+    setAssessmentMode(false);
+    setFlowStep("chat");
+
+  } catch (err) {
+    console.error(err);
+  }
+}
+    async function deleteSession(sessionId) {
+  try {
+    await apiFetch(`/api/sessions/${sessionId}`, {
+      method: "DELETE",
+    });
+
+    setSessions(prev =>
+      prev.filter(
+        s => s.session_id !== sessionId
+      )
+    );
+
+    if (activeSession === sessionId) {
+  setActiveSession(null);
+  setAnalysisCtx(null);
+  setAssessmentMode(false);
+  setFlowStep("upload");
+  setPatientName("");
+  setSelectedLanguage("");
 }
 
-  async function loadSession(sessionId) {
-    try {
-        const history = await apiFetch(
-            `/api/chat-history/${sessionId}`
-        );
-
-        setActiveSession(sessionId);
-
-        setAnalysisCtx({
-            session_id: history.session_id,
-            prediction: history.prediction,
-            confidence: history.confidence,
-        });
-
-
-        const restoredMessages = [
-            {
-                role: "bot",
-                text: "I've analysed your image. Here's the screening report:",
-                report: history.report,
-                prediction: history.prediction,
-                confidence: history.confidence,
-                imageUrl: history.image_url,
-            },
-            ...history.messages.map(msg => ({
-                role: msg.role === "assistant" ? "bot" : "user",
-                text: msg.content,
-            })),
-        ];
-
-        setMessages(restoredMessages);
-
-    } catch (err) {
-        console.error(err);
-    }
+  } catch (err) {
+    alert(err.message);
   }
-
-  useEffect(() => {
-  loadLatestSession();
-  }, []);
+}
+function createNewSession() {
+  setActiveSession(null);
+  setAnalysisCtx(null);
+  setAssessmentMode(false);
+  setFlowStep("upload");
+  setPatientName("");
+  setSelectedLanguage("");
+  setInput("");
+  setMessages([]);  
+  setSearchTerm("");
+}
+useEffect(() => {
+  apiFetch("/api/sessions")
+    .then(data => setSessions(data))
+    .catch(err => console.error(err));
+}, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -735,6 +867,12 @@ function ChatScreen({ user, onLogout }) {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
+
+    const validationError = validateImageFile(file);
+    if (validationError) {
+      addMessage({ role: "bot", text: validationError });
+      return;
+    }
 
     const imageUrl = URL.createObjectURL(file);
     addMessage({ role: "user", imageUrl, text: "Here's my eye image." });
@@ -752,18 +890,12 @@ function ChatScreen({ user, onLogout }) {
         confidence: data.confidence,
       });
 
-      addMessage({
+     addMessage({
         role: "bot",
-        text: "I've analysed your image. Here's the screening report:",
-        report: data.report,
-        prediction: data.prediction,
-        confidence: data.confidence,
-      });
-
-      addMessage({
-        role: "bot",
-        text: "Feel free to ask me anything about these results — what they mean, what to do next, or anything about eye health.",
-      });
+        text: "Please enter patient name."
+    });
+     
+setFlowStep("name");
     } catch (err) {
       addMessage({ role: "bot", text: `Something went wrong: ${err.message}` });
     } finally {
@@ -772,13 +904,171 @@ function ChatScreen({ user, onLogout }) {
   }
 
   async function handleSend() {
+    console.log("flowStep =", flowStep);
     const question = input.trim();
     if (!question || loading) return;
-
     if (!analysisCtx) {
       addMessage({ role: "bot", text: "Please upload an eye image first so I have context to answer your question." });
       return;
     }
+    if (flowStep === "name") {
+
+  setPatientName(question);
+
+await apiFetch("/api/patient-name", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    session_id: analysisCtx.session_id,
+    patient_name: question,
+  }),
+});
+
+const updatedSessions = await apiFetch("/api/sessions");
+setSessions(updatedSessions);
+
+  addMessage({
+    role: "user",
+    text: question
+  });
+
+  addMessage({
+    role: "bot",
+    text: "Please enter your preferred language."
+  });
+
+  setInput("");
+  setFlowStep("language");
+
+  return;
+}
+
+    if (flowStep === "language") {
+
+  setSelectedLanguage(question);
+
+  addMessage({
+    role: "user",
+    text: question
+  });
+
+  setInput("");
+  setLoading(true);
+
+  await apiFetch("/api/language", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    session_id: analysisCtx.session_id,
+    language: question,
+  }),
+});
+
+  try {
+
+    const assessment = await apiFetch(
+      `/api/assessment/${analysisCtx.session_id}`
+    );
+
+    setAssessmentMode(true);
+    setFlowStep("assessment");
+
+    addMessage({
+      role: "bot",
+      text: assessment.question
+    });
+
+  } catch (err) {
+
+    addMessage({
+      role: "bot",
+      text: `Error: ${err.message}`
+    });
+
+  } finally {
+
+    setLoading(false);
+
+  }
+
+  return;
+}
+if (flowStep === "assessment") {
+
+  addMessage({
+    role: "user",
+    text: question
+  });
+
+  setInput("");
+  setLoading(true);
+
+  try {
+
+    const data = await apiFetch(
+      "/api/assessment",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          session_id: analysisCtx.session_id,
+          answer: question
+        })
+      }
+    );
+
+    if (data.completed) {
+
+      setAssessmentMode(false);
+      setFlowStep("chat");
+
+      addMessage({
+        role: "bot",
+        text: "Assessment completed."
+      });
+
+      addMessage({
+        role: "bot",
+        report: data.report,
+        prediction: analysisCtx.prediction,
+        confidence: analysisCtx.confidence
+      });
+
+      addMessage({
+        role: "bot",
+        text: "You may now ask questions about cataract, eye health, symptoms, or your report."
+      });
+
+    } else {
+
+      addMessage({
+        role: "bot",
+        text: data.question
+      });
+
+    }
+
+  } catch (err) {
+
+    addMessage({
+      role: "bot",
+      text: `Error: ${err.message}`
+    });
+
+  } finally {
+
+    setLoading(false);
+
+  }
+
+  return;
+}
 
     setInput("");
     addMessage({ role: "user", text: question });
@@ -809,6 +1099,16 @@ function ChatScreen({ user, onLogout }) {
     clearToken();
     onLogout();
   }
+const filteredSessions = [...sessions]
+  .sort(
+    (a, b) =>
+      new Date(b.created_at) - new Date(a.created_at)
+  )
+  .filter(session =>
+    (session.title || "")
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="shell">
@@ -817,7 +1117,7 @@ function ChatScreen({ user, onLogout }) {
         <div className="header-left">
           <div className="header-icon">👁️</div>
           <div>
-            <div className="header-title">EyeCare Assistant</div>
+            <div className="header-title">EyeScan Assistant</div>
             <div className="header-sub">AI-powered cataract screening</div>
           </div>
         </div>
@@ -829,85 +1129,163 @@ function ChatScreen({ user, onLogout }) {
 
           {/* Session Sidebar */}
           <div className="session-sidebar">
-          <div className="session-header">
-          Previous Sessions
-      </div>
 
-      {sessions.map(session => (
-      <button
-        key={session.session_id}
-        className={
-          activeSession === session.session_id
-            ? "session-item active"
-            : "session-item"
-        }
-        onClick={() => loadSession(session.session_id)}
-      >
-          <div>
-            {session.title || "Untitled Session"}
+          <button
+            className="new-chat-btn"
+            onClick={createNewSession}
+          >
+            + New Assessment
+          </button>
+          <input
+          type="text"
+          placeholder="🔍 Search patient..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="search-input"
+        />
+        <div className="session-header">
+            Recents
           </div>
-          <small>
-          {session.prediction}
-        </small>
-        </button>
+
+      {filteredSessions.map(session => (
+      <div
+  key={session.session_id}
+  className={
+    activeSession === session.session_id
+      ? "session-item active"
+      : "session-item"
+  }
+>
+
+  <div
+    onClick={() => loadSession(session.session_id)}
+    style={{
+      cursor: "pointer"
+    }}
+  >
+    <div>
+      {session.title || "New Assessment"}
+    </div>
+
+    <small>
+      {session.prediction}
+    </small>
+  </div>
+
+  <button
+    onClick={(e) => {
+    e.stopPropagation();
+
+    if (window.confirm("Delete this session?")) {
+      deleteSession(session.session_id);
+    }
+  }}
+    style={{
+  marginTop: "4px",
+  padding: "2px 6px",
+  border: "none",
+  background: "#fff0f0",
+  borderRadius: "6px",
+  cursor: "pointer",
+  fontSize: "11px",
+  color: "#dc2626",
+  alignSelf: "flex-end"
+}}
+  >
+    🗑 Delete
+  </button>
+
+</div>
         ))}
         </div>
 
         {/* Messages */}
+        <div className="chat-area">
         <div className="messages">
           <div className="messages-inner">
-          {messages.map((msg, i) => (
-          <Message key={i} msg={msg} />
-          ))}
-          {loading && <TypingBubble />}
-          <div ref={bottomRef} />
+          {flowStep === "upload" && !analysisCtx ? (
+            <div className="upload-prompt">
+              <div className="upload-prompt-icon">👁️</div>
+              <div style={{ fontSize: "16px", fontWeight: "600", color: "#1a1a2e" }}>
+                Hi there! I'm your EyeScan Assistant.
+              </div>
+              <div style={{ color: "#6b7280", fontSize: "13px" }}>
+                Upload an eye image to begin cataract screening.
+              </div>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                ref={fileRef}
+                style={{ display: "none" }}
+                onChange={handleUpload}
+              />
+              <button
+                className="btn-primary"
+                style={{ maxWidth: "220px" }}
+                onClick={() => fileRef.current?.click()}
+              >
+                Upload Eye Image
+              </button>
+            </div>
+          ) : (
+            <>
+              {messages.map((msg, i) => (
+                <Message key={i} msg={msg} />
+              ))}
+              {loading && <TypingBubble />}
+              <div ref={bottomRef} />
+            </>
+          )}
           </div>
 
           </div>
 
-        </div>
-  
       {/* Disclaimer */}
       <div className="disclaimer">
         For screening and educational purposes only. Always consult an ophthalmologist.
       </div>
 
       {/* Input bar */}
-      <div className="input-bar">
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          ref={fileRef}
-          style={{ display: "none" }}
-          onChange={handleUpload}
-        />
-        <button
-          className="btn-upload"
-          title="Upload eye image"
-          onClick={() => fileRef.current?.click()}
-          disabled={loading}
-        >
-          📎
-        </button>
-        <textarea
-          ref={textareaRef}
-          rows={1}
-          placeholder={analysisCtx ? "Ask about your results…" : "Upload an image to start…"}
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={handleKey}
-          disabled={loading || !analysisCtx}
-        />
-        <button className="btn-send" onClick={handleSend} disabled={loading || !input.trim() || !analysisCtx}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1a1a2e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="22" y1="2" x2="11" y2="13" />
-            <polygon points="22 2 15 22 11 13 2 9 22 2" />
-          </svg>
-        </button>
-      </div>
+      {analysisCtx && (
+        <div className="input-bar">
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            ref={fileRef}
+            style={{ display: "none" }}
+            onChange={handleUpload}
+          />
+
+
+    <textarea
+      ref={textareaRef}
+      rows={1}
+      placeholder="Type your message..."
+      value={input}
+      onChange={e => setInput(e.target.value)}
+      onKeyDown={handleKey}
+      disabled={loading}
+    />
+
+    <button
+      className="btn-send"
+      onClick={handleSend}
+      disabled={loading || !input.trim()}
+    >
+      ➤
+    </button>
+  </div>
+
+)}
+
+</div>
+
+</div>
+
     </div>
   );
 }
+
 
 // ── Root ──────────────────────────────────────────────────────────────────────
 
