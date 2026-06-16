@@ -5,26 +5,51 @@ import os
 import sys
 import uuid
 from pathlib import Path
-from typing import Any
+from PIL import Image, UnidentifiedImageError
 
 from flask import Flask, jsonify, request, send_from_directory, url_for
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(PROJECT_ROOT / "src" /".env")
+
 from extensions import db
 from auth import auth_bp, token_required, User, ChatSession, ChatMessage
 
-PROJECT_ROOT = Path(__file__).resolve().parent
 SRC_DIR = PROJECT_ROOT / "src"
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", PROJECT_ROOT / "uploads"))
-load_dotenv(PROJECT_ROOT / ".env")
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 MAX_CONTENT_LENGTH = 8 * 1024 * 1024
+
+ASSESSMENT_QUESTIONS = [
+    {
+        "symptom": "blurred vision",
+        "question": "Do you experience blurred vision?"
+    },
+    {
+        "symptom": "night vision difficulty",
+        "question": "Do you have difficulty seeing at night?"
+    },
+    {
+        "symptom": "halos around lights",
+        "question": "Do you see halos around lights?"
+    },
+    {
+        "symptom": "faded colors",
+        "question": "Do colors appear faded?"
+    },
+    {
+        "symptom": "light sensitivity",
+        "question": "Are bright lights uncomfortable?"
+    }
+]
+
 
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from gemini_helper import ask_question, generate_report  # noqa: E402
+from gemini_helper import ask_question, generate_report, translate_text  # noqa: E402
 from predict import predict_cataract  # noqa: E402
 
 app = Flask(__name__)
@@ -45,7 +70,6 @@ with app.app_context():
     db.create_all()
 
 # In-memory convenience cache for follow-up questions during local development.
-ANALYSES: dict[str, dict[str, Any]] = {}
 
 @app.after_request
 def add_cors_headers(response):
@@ -53,7 +77,7 @@ def add_cors_headers(response):
     response.headers["Access-Control-Allow-Headers"] = (
         "Content-Type, Authorization"
     )
-    response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
+    response.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS,PUT,DELETE"
     return response
 
 
@@ -101,51 +125,74 @@ def analyze_image(current_user):
     image_path = UPLOAD_DIR / stored_filename
     image_file.save(image_path)
 
-    symptoms = parse_symptoms(request.form.getlist("symptoms"), request.form.get("symptoms"))
+    try:
+        with Image.open(image_path) as img:
+            img.verify()  # catches corrupted/non-image files
+    except (UnidentifiedImageError, Exception):
+        image_path.unlink(missing_ok=True)  # clean up the saved file
+        return error_response("Uploaded file is not a valid image.", 400)
+
+    try:
+        with Image.open(image_path) as img:
+            if img.format not in ("JPEG", "PNG", "WEBP"):
+                image_path.unlink(missing_ok=True)
+                return error_response("Only JPG, PNG, and WebP images are supported.", 400)
+    except Exception:
+        image_path.unlink(missing_ok=True)
+        return error_response("Could not read the uploaded image.", 400)
 
     try:
         prediction_result = predict_cataract(image_path)
         prediction = str(prediction_result["label"])
         confidence_percent = round(float(prediction_result["confidence"]) * 100, 2)
-        username = current_user.email
 
-        language = request.form.get(
-            "language",
-            "English"
-        )
-        report = generate_report(
-            username,
-            prediction,
-            confidence_percent,
-            symptoms,
-            language
-        )
     except Exception as exc:
+        try:
+            if image_path.exists():
+                image_path.unlink()
+
+        except Exception:
+            pass
+
         return error_response(str(exc), 500)
 
-    analysis_id = uuid.uuid4().hex
     session_id = uuid.uuid4().hex
 
     chat_session = ChatSession(
         session_id=session_id,
         user_id=current_user.id,
-        title=f"{username} - {datetime.now().strftime('%d-%m %H:%M')}",
+        title=None,
         prediction=prediction,
         confidence=confidence_percent,
-        report=report,
-        language=language,
+        report=None,
+        language=None,
         image_url=url_for(
             "uploaded_file",
             filename=stored_filename,
-            _external=True
         ),
+        patient_name=None,
     )
 
     db.session.add(chat_session)
     db.session.commit()
 
+    greeting_message = ChatMessage(
+        session_id=chat_session.id,
+        role="assistant",
+        content="Hi! I'm your EyeCare Assistant. I've analysed your image."
+    )
+    db.session.add(greeting_message)
+
+    assistant_message = ChatMessage(
+        session_id=chat_session.id,
+        role="assistant",
+        content="Please enter patient's name"
+    )
+
+    db.session.add(assistant_message)
+    db.session.commit()
+
     analysis = {
-        "analysis_id": analysis_id,
         "session_id": session_id,
         "image": {
             "filename": stored_filename,
@@ -153,11 +200,10 @@ def analyze_image(current_user):
         },
         "prediction": prediction,
         "confidence": confidence_percent,
-        "symptoms": symptoms,
-        "report": report,
+        "symptoms": [],
+        "report": None,
         "raw_prediction": prediction_result,
     }
-    ANALYSES[analysis_id] = analysis
 
     return jsonify(analysis)
 
@@ -191,6 +237,10 @@ def get_chat_history(current_user, session_id):
             "confidence": session.confidence,
             "report": session.report,
             "image_url": session.image_url,
+            "assessment_completed":session.assessment_completed,
+            "current_question":session.current_question,
+            "patient_name":session.patient_name,
+            "language":session.language,
             "messages": [
                 {
                     "role": m.role,
@@ -264,6 +314,12 @@ def chat(current_user):
             403
         )
 
+    if not chat_session.assessment_completed:
+        return error_response(
+            "Please complete the assessment first.",
+            400
+        )
+
     prediction = chat_session.prediction
     confidence = chat_session.confidence
 
@@ -276,6 +332,13 @@ def chat(current_user):
     db.session.add(user_message)
 
     try:
+        try:
+            symptoms = json.loads(
+                chat_session.symptoms or "[]"
+            )
+        except Exception:
+            symptoms = []
+
         recent_messages = [
             {
                 "role": msg.role,
@@ -289,8 +352,9 @@ def chat(current_user):
             question,
             prediction,
             confidence,
+            symptoms,
             chat_session.language,
-            recent_messages
+            recent_messages,
         )
 
         assistant_message = ChatMessage(
@@ -309,8 +373,6 @@ def chat(current_user):
             str(exc),
             500
         )
-
-    db.session.commit()
 
     return jsonify(
         {
@@ -353,7 +415,17 @@ def get_sessions(current_user):
         for s in sessions
     ])
 @app.get("/uploads/<path:filename>")
-def uploaded_file(filename: str):
+@token_required
+def uploaded_file(current_user, filename: str):
+    # Verify the requesting user owns a session that references this image
+    session = ChatSession.query.filter(
+        ChatSession.user_id == current_user.id,
+        ChatSession.image_url.like(f"%{filename}%")
+    ).first()
+
+    if session is None:
+        return error_response("Not found.", 404)
+
     return send_from_directory(UPLOAD_DIR, filename)
 
 
@@ -366,6 +438,306 @@ def file_too_large(_error):
 def not_found(_error):
     return error_response("Route not found.", 404)
 
+@app.post("/api/language")
+@token_required
+def save_language(current_user):
+
+    payload = request.get_json(silent=True) or {}
+
+    session_id = str(
+        payload.get("session_id", "")
+    ).strip()
+
+    language = str(
+        payload.get("language", "")
+    ).strip()
+
+    if not language:
+        return error_response(
+            "Language is required.",
+            400
+        )
+
+    chat_session = ChatSession.query.filter_by(
+        session_id=session_id
+    ).first()
+
+    if chat_session is None:
+        return error_response(
+            "Session not found.",
+            404
+        )
+
+    if chat_session.user_id != current_user.id:
+        return error_response(
+            "Unauthorized",
+            403
+        )
+
+    chat_session.language = language
+
+    user_message = ChatMessage(
+        session_id=chat_session.id,
+        role="user",
+        content=language
+    )
+
+    db.session.add(user_message)
+
+    db.session.commit()
+
+    return jsonify(
+        {
+            "success": True,
+            "language": language
+        }
+    )
+
+@app.get("/api/assessment/<session_id>")
+@token_required
+def get_assessment_question(current_user, session_id):
+
+    chat_session = ChatSession.query.filter_by(
+        session_id=session_id
+    ).first()
+
+    if chat_session is None:
+        return error_response("Session not found.", 404)
+
+    if chat_session.user_id != current_user.id:
+        return error_response("Unauthorized", 403)
+
+    current_question = chat_session.current_question
+
+    if current_question >= len(ASSESSMENT_QUESTIONS):
+        return jsonify({"completed": True, "message": "Assessment completed."})
+
+    question = ASSESSMENT_QUESTIONS[current_question]["question"]
+
+    translated_question = translate_text(
+        question,
+        chat_session.language or "English"
+    )
+
+    if not chat_session.current_question_persisted:
+        assistant_message = ChatMessage(
+            session_id=chat_session.id,
+            role="assistant",
+            content=translated_question
+        )
+        db.session.add(assistant_message)
+        chat_session.current_question_persisted = True
+        db.session.commit()
+
+    return jsonify({
+        "completed": False,
+        "question_number": current_question + 1,
+        "total_questions": len(ASSESSMENT_QUESTIONS),
+        "question": translated_question
+    })
+@app.post("/api/assessment")
+@token_required
+def submit_assessment(current_user):
+
+    payload = request.get_json(silent=True) or {}
+
+    session_id = str(
+        payload.get("session_id", "")
+    ).strip()
+
+    answer = str(
+        payload.get("answer", "")
+    ).strip().upper()
+
+    chat_session = ChatSession.query.filter_by(
+        session_id=session_id
+    ).first()
+
+    if chat_session is None:
+        return error_response(
+            "Session not found.",
+            404
+        )
+
+    if chat_session.user_id != current_user.id:
+        return error_response(
+            "Unauthorized",
+            403
+        )
+
+    if answer not in ["Y", "N"]:
+        return error_response(
+            "Answer must be Y or N.",
+            400
+        )
+
+    current_question = chat_session.current_question
+
+    if current_question >= len(ASSESSMENT_QUESTIONS):
+        return jsonify(
+            {
+                "completed": True,
+                "report": chat_session.report,
+            }
+        )
+
+    question_data = ASSESSMENT_QUESTIONS[
+        current_question
+    ]
+    try:
+        symptoms = json.loads(
+            chat_session.symptoms or "[]"
+        )
+    except Exception:
+        symptoms = []
+
+    if answer == "Y":
+        symptoms.append(
+            question_data["symptom"]
+        )
+
+    user_message = ChatMessage(
+        session_id=chat_session.id,
+        role="user",
+        content=answer
+    )
+
+    db.session.add(user_message)
+
+    chat_session.symptoms = json.dumps(
+        symptoms
+    )
+
+    chat_session.current_question += 1
+    chat_session.current_question_persisted = False
+
+    if chat_session.current_question >= len(
+        ASSESSMENT_QUESTIONS
+    ):
+        report = generate_report(
+            chat_session.patient_name,
+            chat_session.prediction,
+            chat_session.confidence,
+            symptoms,
+            chat_session.language or "English"
+        )
+
+        chat_session.report = report
+        chat_session.assessment_completed = True
+
+        assistant_message = ChatMessage(
+            session_id=chat_session.id,
+            role="assistant",
+            content=report
+        )
+
+        db.session.add(assistant_message)
+        db.session.commit()
+
+        return jsonify(
+            {
+                "completed": True,
+                "report": report
+            }
+        )
+
+    next_question = ASSESSMENT_QUESTIONS[
+        chat_session.current_question
+    ]["question"]
+
+    translated_question = translate_text(
+        next_question,
+        chat_session.language or "English"
+    )
+
+    assistant_message = ChatMessage(
+        session_id=chat_session.id,
+        role="assistant",
+        content=translated_question
+    )
+
+    db.session.add(assistant_message)
+
+    db.session.commit()
+
+    return jsonify(
+        {
+            "completed": False,
+            "question_number": chat_session.current_question + 1,
+            "total_questions": len(ASSESSMENT_QUESTIONS),
+            "question": translated_question
+        }
+    )
+
+@app.post("/api/patient-name")
+@token_required
+def save_patient_name(current_user):
+
+    payload = request.get_json(silent=True) or {}
+
+    session_id = str(
+        payload.get("session_id", "")
+    ).strip()
+
+    patient_name = str(
+        payload.get("patient_name", "")
+    ).strip()
+
+    if not patient_name:
+        return error_response(
+            "Patient name is required.",
+            400
+        )
+
+    chat_session = ChatSession.query.filter_by(
+        session_id=session_id
+    ).first()
+
+    if chat_session is None:
+        return error_response(
+            "Session not found.",
+            404
+        )
+
+    if chat_session.user_id != current_user.id:
+        return error_response(
+            "Unauthorized",
+            403
+        )
+
+    chat_session.patient_name = patient_name
+
+    chat_session.title = (
+        f"{patient_name} - "
+        f"{chat_session.created_at.strftime('%d-%m %H:%M')}"
+    )
+
+    user_message = ChatMessage(
+        session_id=chat_session.id,
+        role="user",
+        content=patient_name
+    )
+
+    assistant_message = ChatMessage(
+        session_id=chat_session.id,
+        role="assistant",
+        content="Please enter your preferred language."
+    )
+
+    db.session.add(user_message)
+    db.session.add(assistant_message)
+
+    db.session.commit()
+
+    return jsonify(
+        {
+            "success": True,
+            "patient_name": patient_name,
+            "title": chat_session.title
+        }
+    )
+
+
 
 def is_allowed_file(filename: str) -> bool:
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -375,44 +747,6 @@ def build_stored_filename(filename: str) -> str:
     safe_name = secure_filename(filename)
     suffix = Path(safe_name).suffix.lower()
     return f"{uuid.uuid4().hex}{suffix}"
-
-
-def parse_symptoms(repeated_values: list[str], raw_value: str | None) -> list[str]:
-    values = repeated_values or []
-
-    if raw_value and not values:
-        try:
-            decoded = json.loads(raw_value)
-            if isinstance(decoded, list):
-                values = [str(item) for item in decoded]
-            else:
-                values = [str(decoded)]
-        except json.JSONDecodeError:
-            values = raw_value.split(",")
-
-    return [value.strip() for value in values if value and value.strip()]
-
-
-def get_chat_context(payload: dict[str, Any]) -> tuple[str | None, float | None]:
-    analysis_id = payload.get("analysis_id")
-    if analysis_id and analysis_id in ANALYSES:
-        analysis = ANALYSES[str(analysis_id)]
-        return str(analysis["prediction"]), float(analysis["confidence"])
-
-    prediction = payload.get("prediction")
-    confidence = payload.get("confidence")
-    if prediction is None or confidence is None:
-        return None, None
-
-    return str(prediction), normalize_confidence(confidence)
-
-
-def normalize_confidence(confidence: Any) -> float:
-    value = float(confidence)
-    if 0 <= value <= 1:
-        value *= 100
-    return round(value, 2)
-
 
 def error_response(message: str, status_code: int):
     response = jsonify({"error": message})
