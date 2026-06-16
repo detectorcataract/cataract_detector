@@ -8,14 +8,19 @@ import bcrypt
 import jwt
 from flask import Blueprint, jsonify, request
 
+from email_validator import validate_email, EmailNotValidError
+
+
 # ── Blueprint ──────────────────────────────────────────────────────────────────
 # Register this in your main app.py with: app.register_blueprint(auth_bp)
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 # Set these in your .env file
-JWT_SECRET = os.getenv("JWT_SECRET", "change-this-secret-in-production")
-JWT_EXPIRY_HOURS = int(os.getenv("JWT_EXPIRY_HOURS", 24))
+JWT_SECRET = os.getenv("JWT_SECRET")
+if not JWT_SECRET:
+    raise RuntimeError("JWT_SECRET environment variable is required.")
+JWT_EXPIRY_HOURS = int(os.getenv("JWT_EXPIRY_HOURS", 4))
 
 # ── DB ─────────────────────────────────────────────────────────────────────────
 # Import your db instance — adjust this import to match your project structure.
@@ -74,12 +79,24 @@ class ChatSession(db.Model):
 
     )
 
+    patient_name = db.Column(db.String(255))
+
     messages = db.relationship(
         "ChatMessage",
         backref="chat_session",
         lazy=True,
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
+        order_by="ChatMessage.id",
     )
+
+    assessment_completed = db.Column(
+        db.Boolean,
+        default=False
+    )
+
+    symptoms = db.Column(db.Text)
+    current_question = db.Column(db.Integer,default=0)
+    current_question_persisted = db.Column(db.Boolean, default=False, nullable=False)
 
 
 class ChatMessage(db.Model):
@@ -100,8 +117,6 @@ class ChatMessage(db.Model):
         db.DateTime,
         default=lambda: datetime.now(timezone.utc)
     )
-
-
 
 # ── JWT helpers ────────────────────────────────────────────────────────────────
 
@@ -170,7 +185,18 @@ def register():
     if not email or not password:
         return jsonify({"error": "Email and password are required."}), 400
 
-    if len(password) < 6:
+    try:
+        email = validate_email(
+            email,
+            check_deliverability=True
+        ).normalized
+
+    except EmailNotValidError:
+        return jsonify(
+            {"error": "Invalid email format."}
+        ), 400
+
+    if len(password) < 8:
         return jsonify({"error": "Password must be at least 6 characters."}), 400
 
     # Check if email already exists
