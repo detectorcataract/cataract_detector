@@ -1,5 +1,4 @@
 from __future__ import annotations
-from datetime import datetime, UTC
 import json
 import os
 import sys
@@ -15,41 +14,17 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(PROJECT_ROOT / "src" /".env")
 
 from extensions import db
-from auth import auth_bp, token_required, User, ChatSession, ChatMessage
+from auth import auth_bp, token_required, ChatSession, ChatMessage
 
 SRC_DIR = PROJECT_ROOT / "src"
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", PROJECT_ROOT / "uploads"))
 ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp"}
 MAX_CONTENT_LENGTH = 8 * 1024 * 1024
 
-ASSESSMENT_QUESTIONS = [
-    {
-        "symptom": "blurred vision",
-        "question": "Do you experience blurred vision?"
-    },
-    {
-        "symptom": "night vision difficulty",
-        "question": "Do you have difficulty seeing at night?"
-    },
-    {
-        "symptom": "halos around lights",
-        "question": "Do you see halos around lights?"
-    },
-    {
-        "symptom": "faded colors",
-        "question": "Do colors appear faded?"
-    },
-    {
-        "symptom": "light sensitivity",
-        "question": "Are bright lights uncomfortable?"
-    }
-]
-
-
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from gemini_helper import ask_question, generate_report, translate_text  # noqa: E402
+from gemini_helper import ask_question, generate_report, translate_text, ASSESSMENT_QUESTIONS  # noqa: E402
 from predict import predict_cataract  # noqa: E402
 
 app = Flask(__name__)
@@ -68,8 +43,6 @@ app.register_blueprint(auth_bp)
 
 with app.app_context():
     db.create_all()
-
-# In-memory convenience cache for follow-up questions during local development.
 
 @app.after_request
 def add_cors_headers(response):

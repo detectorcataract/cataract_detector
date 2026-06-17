@@ -1,9 +1,3 @@
-"""Inference helpers for the cataract detector ensemble.
-
-The public function is ``predict_cataract``. It accepts an unprocessed image,
-prepares it for both saved Keras models, averages their class probabilities
-(soft voting), and returns the final prediction.
-"""
 
 from __future__ import annotations
 
@@ -45,25 +39,6 @@ def predict_cataract(
     resnet50_preprocessing: PreprocessingMode = "embedded",
     mobilenetv2_preprocessing: PreprocessingMode = "embedded",
 ) -> dict[str, Any]:
-    """Predict cataract status using a ResNet50 + MobileNetV2 soft-voting ensemble.
-
-    Args:
-        image: Unprocessed input image. Supported values are a file path, raw
-            image bytes, ``PIL.Image.Image``, or a numpy array.
-        resnet50_model_path: Path to the saved ResNet50 ``.keras`` model.
-        mobilenetv2_model_path: Path to the saved MobileNetV2 ``.keras`` model.
-        labels_path: JSON file containing ``{"class_names": [...]}``.
-        resnet50_preprocessing: Use ``"embedded"`` when preprocessing is already
-            part of the saved model graph. Use ``"resnet50"`` only if the model
-            expects externally preprocessed ResNet50 input.
-        mobilenetv2_preprocessing: Use ``"embedded"`` when preprocessing is
-            already part of the saved model graph. Use ``"mobilenetv2"`` only if
-            the model expects externally preprocessed MobileNetV2 input.
-
-    Returns:
-        A dictionary with the winning label, confidence, class index, ensemble
-        probabilities, and per-model probabilities.
-    """
 
     labels = _load_labels(Path(labels_path))
     resnet_model = _load_model(Path(resnet50_model_path))
