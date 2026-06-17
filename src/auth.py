@@ -1,0 +1,230 @@
+from __future__ import annotations
+
+import os
+from datetime import datetime, timedelta, timezone
+from functools import wraps
+
+import bcrypt
+import jwt
+from flask import Blueprint, jsonify, request
+
+from email_validator import validate_email, EmailNotValidError
+
+
+# ── Blueprint ──────────────────────────────────────────────────────────────────
+auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
+
+# ── Config ─────────────────────────────────────────────────────────────────────
+JWT_SECRET = os.getenv("JWT_SECRET")
+if not JWT_SECRET:
+    raise RuntimeError("JWT_SECRET environment variable is required.")
+JWT_EXPIRY_HOURS = int(os.getenv("JWT_EXPIRY_HOURS", 4))
+
+# ── DB ─────────────────────────────────────────────────────────────────────────
+from extensions import db # noqa: E402
+
+
+class User(db.Model):
+    __tablename__ = "users"
+
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(255), unique=True, nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    def set_password(self, plain_password: str) -> None:
+        """Hash and store the password using bcrypt."""
+        self.password_hash = bcrypt.hashpw(
+            plain_password.encode("utf-8"), bcrypt.gensalt()
+        ).decode("utf-8")
+
+    def check_password(self, plain_password: str) -> bool:
+        """Verify a plain password against the stored hash."""
+        return bcrypt.checkpw(
+            plain_password.encode("utf-8"),
+            self.password_hash.encode("utf-8"),
+        )
+
+    def to_dict(self) -> dict:
+        return {"id": self.id, "email": self.email, "created_at": str(self.created_at)}
+
+
+class ChatSession(db.Model):
+    __tablename__ = "chat_sessions"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    session_id = db.Column(db.String(64), unique=True, nullable=False)
+
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("users.id"),
+        nullable=False
+    )
+
+    title = db.Column(db.String(255))
+    prediction = db.Column(db.String(100))
+    confidence = db.Column(db.Float)
+    language = db.Column(db.String(50))
+    report = db.Column(db.Text)
+    image_url = db.Column(db.String(500))
+
+    created_at = db.Column(
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc)
+
+    )
+
+    patient_name = db.Column(db.String(255))
+
+    messages = db.relationship(
+        "ChatMessage",
+        backref="chat_session",
+        lazy=True,
+        cascade="all, delete-orphan",
+        order_by="ChatMessage.id",
+    )
+
+    assessment_completed = db.Column(
+        db.Boolean,
+        default=False
+    )
+
+    symptoms = db.Column(db.Text)
+    current_question = db.Column(db.Integer,default=0)
+    current_question_persisted = db.Column(db.Boolean, default=False, nullable=False)
+
+class ChatMessage(db.Model):
+    __tablename__ = "chat_messages"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    session_id = db.Column(
+        db.Integer,
+        db.ForeignKey("chat_sessions.id"),
+        nullable=False
+    )
+
+    role = db.Column(db.String(20))
+    content = db.Column(db.Text)
+
+    timestamp = db.Column(
+        db.DateTime,
+        default=lambda: datetime.now(timezone.utc)
+    )
+
+# ── JWT helpers ────────────────────────────────────────────────────────────────
+
+def generate_token(user_id: int) -> str:
+    payload = {
+        "user_id": user_id,
+        "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRY_HOURS),
+        "iat": datetime.now(timezone.utc),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+
+
+def decode_token(token: str) -> dict | None:
+    try:
+        return jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
+
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            return jsonify({"error": "Authorization header missing or malformed."}), 401
+
+        token = auth_header.split(" ", 1)[1]
+        payload = decode_token(token)
+        if payload is None:
+            return jsonify({"error": "Token is invalid or expired."}), 401
+
+        current_user = db.session.get(User, payload["user_id"])
+        if current_user is None:
+            return jsonify({"error": "User not found."}), 401
+
+        return f(current_user, *args, **kwargs)
+    return decorated
+
+# ── Routes ─────────────────────────────────────────────────────────────────────
+
+@auth_bp.post("/register")
+def register():
+    data = request.get_json(silent=True) or {}
+    email = str(data.get("email", "")).strip().lower()
+    password = str(data.get("password", "")).strip()
+
+    # Basic validation
+    if not email or not password:
+        return jsonify({"error": "Email and password are required."}), 400
+
+    try:
+        email = validate_email(
+            email,
+            check_deliverability=True
+        ).normalized
+
+    except EmailNotValidError:
+        return jsonify(
+            {"error": "Invalid email format."}
+        ), 400
+
+    if len(password) < 8:
+        return jsonify({"error": "Password must be at least 6 characters."}), 400
+
+    # Check if email already exists
+    if User.query.filter_by(email=email).first():
+        return jsonify({"error": "An account with this email already exists."}), 409
+
+    # Create user
+    user = User(email=email)
+    user.set_password(password)
+    db.session.add(user)
+    db.session.commit()
+
+    token = generate_token(user.id)
+
+    return jsonify({
+        "message": "Account created successfully.",
+        "token": token,
+        "user": user.to_dict(),
+    }), 201
+
+@auth_bp.post("/login")
+def login():
+    data = request.get_json(silent=True) or {}
+    email = str(data.get("email", "")).strip().lower()
+    password = str(data.get("password", "")).strip()
+
+    if not email or not password:
+        return jsonify({"error": "Email and password are required."}), 400
+
+    user = User.query.filter_by(email=email).first()
+
+    # Intentionally vague message to avoid leaking whether the email exists
+    if user is None or not user.check_password(password):
+        return jsonify({"error": "Invalid email or password."}), 401
+
+    token = generate_token(user.id)
+
+    return jsonify({
+        "message": "Logged in successfully.",
+        "token": token,
+        "user": user.to_dict(),
+    })
+
+@auth_bp.post("/logout")
+@token_required
+def logout(current_user):
+    return jsonify({"message": "Logged out successfully."})
+
+@auth_bp.get("/me")
+@token_required
+def me(current_user):
+    return jsonify({"user": current_user.to_dict()})
+
