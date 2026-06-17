@@ -12,19 +12,15 @@ from email_validator import validate_email, EmailNotValidError
 
 
 # ── Blueprint ──────────────────────────────────────────────────────────────────
-# Register this in your main app.py with: app.register_blueprint(auth_bp)
 auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-# Set these in your .env file
 JWT_SECRET = os.getenv("JWT_SECRET")
 if not JWT_SECRET:
     raise RuntimeError("JWT_SECRET environment variable is required.")
 JWT_EXPIRY_HOURS = int(os.getenv("JWT_EXPIRY_HOURS", 4))
 
 # ── DB ─────────────────────────────────────────────────────────────────────────
-# Import your db instance — adjust this import to match your project structure.
-# If you're using Flask-SQLAlchemy, this is typically from extensions.py or app.py
 from extensions import db # noqa: E402
 
 
@@ -98,7 +94,6 @@ class ChatSession(db.Model):
     current_question = db.Column(db.Integer,default=0)
     current_question_persisted = db.Column(db.Boolean, default=False, nullable=False)
 
-
 class ChatMessage(db.Model):
     __tablename__ = "chat_messages"
 
@@ -121,7 +116,6 @@ class ChatMessage(db.Model):
 # ── JWT helpers ────────────────────────────────────────────────────────────────
 
 def generate_token(user_id: int) -> str:
-    """Generate a signed JWT that expires after JWT_EXPIRY_HOURS."""
     payload = {
         "user_id": user_id,
         "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRY_HOURS),
@@ -131,7 +125,6 @@ def generate_token(user_id: int) -> str:
 
 
 def decode_token(token: str) -> dict | None:
-    """Decode and validate a JWT. Returns the payload or None if invalid/expired."""
     try:
         return jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
     except jwt.ExpiredSignatureError:
@@ -139,17 +132,7 @@ def decode_token(token: str) -> dict | None:
     except jwt.InvalidTokenError:
         return None
 
-
 def token_required(f):
-    """
-    Decorator to protect routes that require authentication.
-
-    Usage:
-        @app.get("/api/protected")
-        @token_required
-        def protected_route(current_user):
-            return jsonify(current_user.to_dict())
-    """
     @wraps(f)
     def decorated(*args, **kwargs):
         auth_header = request.headers.get("Authorization", "")
@@ -168,15 +151,10 @@ def token_required(f):
         return f(current_user, *args, **kwargs)
     return decorated
 
-
 # ── Routes ─────────────────────────────────────────────────────────────────────
 
 @auth_bp.post("/register")
 def register():
-    """
-    POST /api/auth/register
-    Body: { "email": "...", "password": "..." }
-    """
     data = request.get_json(silent=True) or {}
     email = str(data.get("email", "")).strip().lower()
     password = str(data.get("password", "")).strip()
@@ -217,13 +195,8 @@ def register():
         "user": user.to_dict(),
     }), 201
 
-
 @auth_bp.post("/login")
 def login():
-    """
-    POST /api/auth/login
-    Body: { "email": "...", "password": "..." }
-    """
     data = request.get_json(silent=True) or {}
     email = str(data.get("email", "")).strip().lower()
     password = str(data.get("password", "")).strip()
@@ -245,30 +218,13 @@ def login():
         "user": user.to_dict(),
     })
 
-
-
-
 @auth_bp.post("/logout")
 @token_required
 def logout(current_user):
-    """
-    POST /api/auth/logout
-    Header: Authorization: Bearer <token>
-
-    With stateless JWT, logout is handled on the frontend by deleting the token.
-    This endpoint exists so your React app has a consistent API to call,
-    and is also where you'd add a token blocklist if needed later.
-    """
     return jsonify({"message": "Logged out successfully."})
-
 
 @auth_bp.get("/me")
 @token_required
 def me(current_user):
-    """
-    GET /api/auth/me
-    Header: Authorization: Bearer <token>
-    Returns the currently authenticated user's info.
-    """
     return jsonify({"user": current_user.to_dict()})
 
