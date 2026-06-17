@@ -15,22 +15,55 @@ const styles = `
   }
 
   /* ── Auth ── */
-  .auth-wrapper {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #f0f6ff;
-  }
+ .auth-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0f6ff;
+  padding: 40px;
+}
+.landing-container {
+  width: 100%;
+  max-width: 1200px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 80px;
+}
 
-  .auth-card {
-    background: #fff;
-    border-radius: 16px;
-    padding: 40px 36px;
-    width: 100%;
-    max-width: 400px;
-    box-shadow: 0 4px 24px rgba(100,149,237,0.10);
-  }
+.hero-section {
+  flex: 1;
+  max-width: 600px;
+}
+
+.hero-logo img {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  margin-bottom: 20px;
+}
+
+.hero-section h1 {
+  font-size: 52px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  color: #1a1a2e;
+}
+
+.hero-section p {
+  font-size: 18px;
+  line-height: 1.8;
+  color: #4b5563;
+}
+.auth-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 40px 36px;
+  width: 420px;
+  flex-shrink: 0;
+  box-shadow: 0 4px 24px rgba(100,149,237,0.10);
+}
 
   .auth-card input {
   color: #1f2937;
@@ -54,6 +87,14 @@ const styles = `
     justify-content: center;
     font-size: 18px;
   }
+.auth-logo-icon img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+.auth-logo-icon {
+  overflow: hidden;
+}
 
   .auth-logo-text {
     font-size: 18px;
@@ -136,6 +177,60 @@ const styles = `
     font-weight: 500;
     padding: 0;
   }
+.auth-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0f6ff;
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-wrapper::before {
+  content: "";
+  position: absolute;
+  width: 500px;
+  height: 500px;
+  background: rgba(189, 215, 255, 0.4);
+  border-radius: 50%;
+  top: -150px;
+  left: -150px;
+  filter: blur(40px);
+}
+
+.auth-wrapper::after {
+  content: "";
+  position: absolute;
+  width: 400px;
+  height: 400px;
+  background: rgba(147, 197, 253, 0.3);
+  border-radius: 50%;
+  bottom: -120px;
+  right: -120px;
+  filter: blur(40px);
+}
+.arc-1 {
+  position: absolute;
+  width: 700px;
+  height: 700px;
+  border: 45px solid #93c5fd;
+  border-radius: 50%;
+  top: -450px;
+  left: -450px;
+  pointer-events: none;
+}
+
+.arc-2 {
+  position: absolute;
+  width: 550px;
+  height: 550px;
+  border: 35px solid #60a5fa;
+  border-radius: 50%;
+  bottom: -300px;
+  right: -300px;
+  pointer-events: none;
+}
 
   .error-msg {
     background: #fff0f0;
@@ -204,6 +299,43 @@ const styles = `
     cursor: pointer;
     transition: all 0.15s;
   }
+.hero-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 25px;
+}
+
+.hero-logo img {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+}
+
+.hero-header h1 {
+  margin: 0;
+  font-size: 42px;
+  color: #1a1a2e;
+}
+
+.hero-header h3 {
+  margin-top: 6px;
+  font-size: 18px;
+  font-weight: 500;
+  color: #64748b;
+}
+.hero-header h4{
+  margin-top: 6px;
+  font-size: 18px;
+  font-weight: 500;
+  color: #000;
+}
+
+.hero-section p {
+  font-size: 17px;
+  line-height: 1.8;
+  color: #4b5563;
+}
 
   .btn-logout:hover { border-color: #bdd7ff; color: #1a1a2e; }
 
@@ -601,85 +733,181 @@ async function fetchProtectedImage(url) {
   return URL.createObjectURL(blob);
 }
 
-// ── Auth Screen ───────────────────────────────────────────────────────────────
-
 function AuthScreen({ onAuth }) {
-  const [mode, setMode] = useState("login"); // "login" | "register"
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+const [mode, setMode] = useState("login");
+const [email, setEmail] = useState("");
+const [password, setPassword] = useState("");
+const [loading, setLoading] = useState(false);
+const [error, setError] = useState("");
 
-  async function handleSubmit() {
-    setError("");
-    if (!email || !password) { setError("Email and password are required."); return; }
-    setLoading(true);
-    try {
-      const data = await apiFetch(`/api/auth/${mode}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      saveToken(data.token);
-      onAuth(data.user);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }
+async function handleSubmit() {
+setError("");
 
-  function handleKey(e) {
-    if (e.key === "Enter") handleSubmit();
-  }
 
-  return (
-    <div className="auth-wrapper">
-      <div className="auth-card">
-        <div className="auth-logo">
-          <div className="auth-logo-icon">👁️</div>
-          <span className="auth-logo-text">EyeScan Assistant</span>
-        </div>
-        <div className="auth-title">{mode === "login" ? "Welcome back" : "Create account"}</div>
-        <div className="auth-sub">
-          {mode === "login"
-            ? "Sign in to continue your screening session."
-            : "Get started with free AI-powered eye screening."}
-        </div>
-        {error && <div className="error-msg">{error}</div>}
-        <div className="field">
-          <label>Email</label>
-          <input
-            type="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            onKeyDown={handleKey}
-          />
-        </div>
-        <div className="field">
-          <label>Password</label>
-          <input
-            type="password"
-            placeholder="••••••••"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            onKeyDown={handleKey}
-          />
-        </div>
-        <button className="btn-primary" onClick={handleSubmit} disabled={loading}>
-          {loading ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"}
-        </button>
-        <div className="auth-switch">
-          {mode === "login" ? "No account yet? " : "Already have an account? "}
-          <button onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }}>
-            {mode === "login" ? "Register" : "Sign in"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+if (!email || !password) {
+  setError("Email and password are required.");
+  return;
 }
+
+setLoading(true);
+
+try {
+  const data = await apiFetch(`/api/auth/${mode}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email,
+      password,
+    }),
+  });
+
+  saveToken(data.token);
+  onAuth(data.user);
+} catch (e) {
+  setError(e.message);
+} finally {
+  setLoading(false);
+}
+
+}
+
+function handleKey(e) {
+if (e.key === "Enter") {
+handleSubmit();
+}
+}
+
+return ( <div className="auth-wrapper"> <div className="landing-container">
+    <div className="hero-section">
+  <div className="hero-header">
+    <div className="hero-logo">
+      <img src="/eyelogo.jpeg" alt="Eye Logo" />
+    </div>
+
+    <div>
+      <h1>EyeScan Assistant</h1>
+      <h3>Empowering Accessible Eye Care</h3>
+    </div>
+  </div>
+<h4>About</h4>
+  <p>
+    EyeScan Assistant is dedicated to improving accessibility to eye
+    health awareness and screening support for individuals across
+    diverse communities. By promoting early awareness, preventive
+    care, and informed decision-making, the platform aims to support
+    better vision health outcomes and encourage timely professional
+    consultation.
+  </p>
+
+</div>
+
+    <div className="auth-card">
+
+      <div className="auth-logo">
+        <div className="auth-logo-icon">
+          <img
+            src="/eyelogo.jpeg"
+            alt="Eye Logo"
+          />
+        </div>
+
+        <span className="auth-logo-text">
+          EyeScan Assistant
+        </span>
+      </div>
+
+      <div className="auth-title">
+        {mode === "login"
+          ? "Welcome back"
+          : "Create account"}
+      </div>
+
+      <div className="auth-sub">
+        {mode === "login"
+          ? "Sign in to continue your screening session."
+          : "Get started with free AI-powered eye screening."}
+      </div>
+      <div className="arc-1"></div>
+      <div className="arc-2"></div>
+
+      {error && (
+        <div className="error-msg">
+          {error}
+        </div>
+      )}
+
+      <div className="field">
+        <label>Email</label>
+
+        <input
+          type="email"
+          placeholder="you@example.com"
+          value={email}
+          onChange={(e) =>
+            setEmail(e.target.value)
+          }
+          onKeyDown={handleKey}
+        />
+      </div>
+
+      <div className="field">
+        <label>Password</label>
+
+        <input
+          type="password"
+          placeholder="••••••••"
+          value={password}
+          onChange={(e) =>
+            setPassword(e.target.value)
+          }
+          onKeyDown={handleKey}
+        />
+      </div>
+
+      <button
+        className="btn-primary"
+        onClick={handleSubmit}
+        disabled={loading}
+      >
+        {loading
+          ? "Please wait…"
+          : mode === "login"
+          ? "Sign in"
+          : "Create account"}
+      </button>
+
+      <div className="auth-switch">
+        {mode === "login"
+          ? "No account yet? "
+          : "Already have an account? "}
+
+        <button
+          onClick={() => {
+            setMode(
+              mode === "login"
+                ? "register"
+                : "login"
+            );
+            setError("");
+          }}
+        >
+          {mode === "login"
+            ? "Register"
+            : "Sign in"}
+        </button>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+
+);
+}
+
 
 // ── Message components ────────────────────────────────────────────────────────
 
