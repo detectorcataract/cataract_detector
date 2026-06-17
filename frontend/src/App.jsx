@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API = import.meta.env.VITE_API_URL
 
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
@@ -31,6 +31,11 @@ const styles = `
     max-width: 400px;
     box-shadow: 0 4px 24px rgba(100,149,237,0.10);
   }
+
+  .auth-card input {
+  color: #1f2937;
+  caret-color: #1f2937;
+}
 
   .auth-logo {
     display: flex;
@@ -146,10 +151,8 @@ const styles = `
     display: flex;
     flex-direction: column;
     height: 100vh;
-    max-width: 760px;
-    margin: 0 auto;
+    width: 100%;
     background: #fff;
-    box-shadow: 0 0 40px rgba(100,149,237,0.08);
   }
 
   /* ── Header ── */
@@ -190,25 +193,6 @@ const styles = `
     color: #6b7280;
   }
 
-  /* ── Step indicator ── */
-  .step-indicator {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 0 24px 0 0;
-  }
-
-  .step-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: #e5e7eb;
-    transition: background 0.2s;
-  }
-
-  .step-dot.active { background: #3b82f6; }
-  .step-dot.done { background: #bdd7ff; }
-
   .btn-logout {
     background: none;
     border: 1.5px solid #e5e7eb;
@@ -232,11 +216,19 @@ const styles = `
     flex-direction: column;
     gap: 16px;
     scroll-behavior: smooth;
+    scrollbar-gutter: stable;
   }
 
-  .messages::-webkit-scrollbar { width: 4px; }
+  .messages-inner {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding : 0 32px;
+  }
+
+  .messages::-webkit-scrollbar { width: 10px; }
   .messages::-webkit-scrollbar-track { background: transparent; }
-  .messages::-webkit-scrollbar-thumb { background: #bdd7ff; border-radius: 4px; }
+  .messages::-webkit-scrollbar-thumb { background: #bdd7ff; border-radius: 10px; }
 
   /* ── Bubble ── */
   .bubble-row {
@@ -302,6 +294,8 @@ const styles = `
     line-height: 1.7;
     color: #374151;
     white-space: pre-wrap;
+    text-align: left;
+
   }
 
   .report-label {
@@ -324,56 +318,6 @@ const styles = `
 
   .badge.cataract { background: #ffe4e4; color: #dc2626; }
   .badge.normal { background: #d1fae5; color: #059669; }
-
-  /* ── Assessment progress bar ── */
-  .assessment-bar-wrap {
-    padding: 10px 24px 0;
-    flex-shrink: 0;
-  }
-
-  .assessment-bar-label {
-    font-size: 11px;
-    color: #6b7280;
-    margin-bottom: 5px;
-  }
-
-  .assessment-bar-track {
-    height: 4px;
-    background: #e5e7eb;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  .assessment-bar-fill {
-    height: 100%;
-    background: #3b82f6;
-    border-radius: 4px;
-    transition: width 0.3s ease;
-  }
-
-  /* ── Y/N quick reply buttons ── */
-  .quick-replies {
-    display: flex;
-    gap: 8px;
-    padding: 10px 24px 0;
-    flex-shrink: 0;
-  }
-
-  .quick-reply-btn {
-    padding: 7px 22px;
-    border-radius: 20px;
-    border: 1.5px solid #bdd7ff;
-    background: #fff;
-    font-size: 13px;
-    font-weight: 600;
-    font-family: inherit;
-    cursor: pointer;
-    color: #1a1a2e;
-    transition: background 0.15s, border-color 0.15s;
-  }
-
-  .quick-reply-btn:hover { background: #bdd7ff; }
-  .quick-reply-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
   /* ── Typing indicator ── */
   .typing {
@@ -411,6 +355,7 @@ const styles = `
     font-size: 14px;
     padding: 40px 24px;
     text-align: center;
+    padding-top: 20vh;
   }
 
   .upload-prompt-icon {
@@ -443,6 +388,8 @@ const styles = `
     line-height: 1.5;
     transition: border-color 0.15s;
     background: #fff;
+    color: #1f2937;
+    caret-color: #1f2937;
   }
 
   .input-bar textarea:focus { border-color: #bdd7ff; }
@@ -465,21 +412,6 @@ const styles = `
   .btn-send:hover { background: #a3c8ff; }
   .btn-send:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  .btn-upload {
-    width: 42px;
-    height: 42px;
-    background: #f0f6ff;
-    border: 1.5px solid #bdd7ff;
-    border-radius: 12px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    transition: background 0.15s;
-    color: #3b82f6;
-    font-size: 18px;
-  }
 
   .btn-upload:hover { background: #bdd7ff; }
   .btn-upload:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -491,9 +423,154 @@ const styles = `
     padding: 6px 24px 14px;
     flex-shrink: 0;
   }
+
+  .main-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.session-sidebar {
+  width: 280px;
+  min-width: 280px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  padding: 12px;
+  border-right: 1px solid #e8f0fe;
+
+  overflow-y: auto;
+  background: #fafcff;
+
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: #bdd7ff transparent;
+}
+
+.session-sidebar::-webkit-scrollbar {
+  width: 10px;
+}
+
+.session-sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.session-sidebar::-webkit-scrollbar-thumb {
+  background: #bdd7ff;
+  border-radius: 10px;
+}
+
+.session-header {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+.new-chat-btn {
+  width: 100%;
+
+  padding: 10px 12px;
+
+  border: none;
+  border-radius: 10px;
+
+  background: #bdd7ff;
+  color: #1a1a2e;
+
+  font-size: 13px;
+  font-weight: 600;
+
+  cursor: pointer;
+
+  margin-bottom: 12px;
+
+  transition: all 0.2s ease;
+}
+
+.new-chat-btn:hover {
+  background: #a3c8ff;
+}
+.search-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e8f0fe;
+  border-radius: 10px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  outline: none;
+  background: white;
+}
+
+.search-input:focus {
+  border-color: #bdd7ff;
+}
+
+.session-item {
+  color: #1a1a2e;
+  width: 100%;
+
+  padding: 10px 12px;
+
+  border: 1px solid #e8f0fe;
+  border-radius: 10px;
+
+  background: white;
+  cursor: pointer;
+
+  text-align: left;
+
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.session-item:hover {
+  background: #f0f6ff;
+}
+
+.session-item.active {
+  border-color: #bdd7ff;
+  background: #f0f6ff;
+}
+
+.session-item small {
+  color: #6b7280;
+}
+
+.chat-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 `;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+const MAX_FILE_SIZE_MB = 8;
+
+const ALLOWED_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp"
+];
+
+function validateImageFile(file) {
+
+  if (!ALLOWED_TYPES.includes(file.type)) {
+    return "Only JPG, PNG, and WebP images are supported.";
+  }
+
+  if (
+    file.size >
+    MAX_FILE_SIZE_MB * 1024 * 1024
+  ) {
+    return `Image must be smaller than ${MAX_FILE_SIZE_MB}MB.`;
+  }
+
+  return null;
+}
 
 function saveToken(t) { localStorage.setItem("eyecare_token", t); }
 function getToken() { return localStorage.getItem("eyecare_token"); }
@@ -509,14 +586,25 @@ async function apiFetch(path, options = {}) {
     },
   });
   const data = await res.json();
+
   if (!res.ok) throw new Error(data.error || "Something went wrong.");
   return data;
+}
+
+async function fetchProtectedImage(url) {
+  const token = getToken();
+  const res = await fetch(url, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!res.ok) return null;
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
 }
 
 // ── Auth Screen ───────────────────────────────────────────────────────────────
 
 function AuthScreen({ onAuth }) {
-  const [mode, setMode] = useState("login");
+  const [mode, setMode] = useState("login"); // "login" | "register"
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -550,7 +638,7 @@ function AuthScreen({ onAuth }) {
       <div className="auth-card">
         <div className="auth-logo">
           <div className="auth-logo-icon">👁️</div>
-          <span className="auth-logo-text">EyeCare Assistant</span>
+          <span className="auth-logo-text">EyeScan Assistant</span>
         </div>
         <div className="auth-title">{mode === "login" ? "Welcome back" : "Create account"}</div>
         <div className="auth-sub">
@@ -610,11 +698,40 @@ function TypingBubble() {
 
 function Message({ msg }) {
   const isBot = msg.role === "bot";
+  const [imgSrc, setImgSrc] = useState(null);
+
+  useEffect(() => {
+    if (!msg.imageUrl) return;
+
+    if (msg.imageUrl.startsWith("blob:")) {
+      setImgSrc(msg.imageUrl);
+      return;
+    }
+
+    let cancelled = false;
+    let objectUrl = null;
+
+    fetchProtectedImage(msg.imageUrl).then(src => {
+      if (cancelled) {
+        // Component unmounted before fetch resolved — clean up immediately
+        if (src) URL.revokeObjectURL(src);
+        return;
+      }
+      objectUrl = src;
+      if (src) setImgSrc(src);
+    });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [msg.imageUrl]);
+
   return (
     <div className={`bubble-row ${msg.role}`}>
       <div className={`avatar ${msg.role}`}>{isBot ? "👁" : "U"}</div>
       <div className={`bubble ${msg.role}`}>
-        {msg.imageUrl && <img src={msg.imageUrl} alt="uploaded eye" className="bubble-img" />}
+        {imgSrc && <img src={imgSrc} alt="uploaded eye" className="bubble-img" />}
         {msg.text}
         {msg.report && (
           <div className="report-card">
@@ -630,44 +747,113 @@ function Message({ msg }) {
   );
 }
 
-// ── Step dots ─────────────────────────────────────────────────────────────────
-
-const STEPS = ["upload", "ask_name", "ask_language", "assessment", "chat"];
-
-function StepDots({ flowStep }) {
-  const current = STEPS.indexOf(flowStep);
-  return (
-    <div className="step-indicator">
-      {STEPS.map((s, i) => (
-        <div
-          key={s}
-          className={`step-dot ${i < current ? "done" : i === current ? "active" : ""}`}
-        />
-      ))}
-    </div>
-  );
-}
-
 // ── Main Chat ─────────────────────────────────────────────────────────────────
 
 function ChatScreen({ user, onLogout }) {
-  const [messages, setMessages] = useState([
-    {
-      role: "bot",
-      text: "Hi! Upload an eye image to begin your cataract screening.",
-    },
-  ]);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-
-  // Workflow state
-  const [flowStep, setFlowStep] = useState("upload"); // upload | ask_name | ask_language | assessment | chat
-  const [sessionCtx, setSessionCtx] = useState(null); // { session_id, prediction, confidence }
-  const [assessmentProgress, setAssessmentProgress] = useState({ current: 0, total: 5 });
-
+  const [sessions, setSessions] = useState([]);
+  const [analysisCtx, setAnalysisCtx] = useState(null); // { analysis_id, prediction, confidence }
+  const [assessmentMode, setAssessmentMode] = useState(false);
+  const [flowStep, setFlowStep] = useState("upload");
+  const [patientName, setPatientName] = useState("");
+  const [selectedLanguage, setSelectedLanguage] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const fileRef = useRef(null);
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
+  const [activeSession, setActiveSession] = useState(null);
+
+  async function loadSession(sessionId) {
+  try {
+    setMessages([]);        // clear immediately
+    setAnalysisCtx(null);  // clear image context
+    setFlowStep("upload"); // force upload state while loading
+
+    const history = await apiFetch(`/api/chat-history/${sessionId}`);
+
+    setActiveSession(sessionId);
+    setAnalysisCtx({
+      session_id: history.session_id,
+      prediction: history.prediction,
+      confidence: history.confidence,
+    });
+
+    // Simple 1:1 mapping — no manual prepend, no imageUrl injection
+    const restoredMessages = history.messages.map((msg, index) => ({
+      role: msg.role === "assistant" ? "bot" : "user",
+      text: msg.content,
+      // attach image only to first assistant message (the greeting stored in DB)
+      ...(index === 0 && msg.role === "assistant" && history.image_url
+        ? { imageUrl: history.image_url }
+        : {}),
+    }));
+
+    setMessages(restoredMessages);
+
+    if (!history.patient_name) {
+      setFlowStep("name");
+      return;
+    }
+    if (!history.language) {
+      setFlowStep("language");
+      return;
+    }
+    if (!history.assessment_completed) {
+      setAssessmentMode(true);
+      setFlowStep("assessment");
+      return;
+    }
+
+    setAssessmentMode(false);
+    setFlowStep("chat");
+
+  } catch (err) {
+    console.error(err);
+  }
+}
+    async function deleteSession(sessionId) {
+  try {
+    await apiFetch(`/api/sessions/${sessionId}`, {
+      method: "DELETE",
+    });
+
+    setSessions(prev =>
+      prev.filter(
+        s => s.session_id !== sessionId
+      )
+    );
+
+    if (activeSession === sessionId) {
+  setActiveSession(null);
+  setAnalysisCtx(null);
+  setAssessmentMode(false);
+  setFlowStep("upload");
+  setPatientName("");
+  setSelectedLanguage("");
+}
+
+  } catch (err) {
+    alert(err.message);
+  }
+}
+function createNewSession() {
+  setActiveSession(null);
+  setAnalysisCtx(null);
+  setAssessmentMode(false);
+  setFlowStep("upload");
+  setPatientName("");
+  setSelectedLanguage("");
+  setInput("");
+  setMessages([]);  
+  setSearchTerm("");
+}
+useEffect(() => {
+  apiFetch("/api/sessions")
+    .then(data => setSessions(data))
+    .catch(err => console.error(err));
+}, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -677,11 +863,16 @@ function ChatScreen({ user, onLogout }) {
     setMessages(prev => [...prev, msg]);
   }
 
-  // ── Upload handler ──────────────────────────────────────────────────────────
   async function handleUpload(e) {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
+
+    const validationError = validateImageFile(file);
+    if (validationError) {
+      addMessage({ role: "bot", text: validationError });
+      return;
+    }
 
     const imageUrl = URL.createObjectURL(file);
     addMessage({ role: "user", imageUrl, text: "Here's my eye image." });
@@ -690,17 +881,21 @@ function ChatScreen({ user, onLogout }) {
     try {
       const form = new FormData();
       form.append("image", file);
-
       const data = await apiFetch("/api/analyze", { method: "POST", body: form });
 
-      setSessionCtx({
+      setAnalysisCtx({
+        analysis_id: data.analysis_id,
         session_id: data.session_id,
         prediction: data.prediction,
         confidence: data.confidence,
       });
 
-      addMessage({ role: "bot", text: "Image analysed! What is your name?" });
-      setFlowStep("ask_name");
+     addMessage({
+        role: "bot",
+        text: "Please enter patient name."
+    });
+     
+setFlowStep("name");
     } catch (err) {
       addMessage({ role: "bot", text: `Something went wrong: ${err.message}` });
     } finally {
@@ -708,141 +903,195 @@ function ChatScreen({ user, onLogout }) {
     }
   }
 
-  // ── Fetch first assessment question ────────────────────────────────────────
-  async function startAssessment(session_id) {
-    setLoading(true);
-    try {
-      const data = await apiFetch(`/api/assessment/${session_id}`);
-      if (data.completed) {
-        addMessage({ role: "bot", text: "No questions needed. Generating your report…" });
-      } else {
-        setAssessmentProgress({ current: data.question_number, total: data.total_questions });
-        addMessage({
-          role: "bot",
-          text: `Question ${data.question_number}/${data.total_questions}: ${data.question}`,
-        });
-        setFlowStep("assessment");
-      }
-    } catch (err) {
-      addMessage({ role: "bot", text: `Error: ${err.message}` });
-    } finally {
-      setLoading(false);
+  async function handleSend() {
+    console.log("flowStep =", flowStep);
+    const question = input.trim();
+    if (!question || loading) return;
+    if (!analysisCtx) {
+      addMessage({ role: "bot", text: "Please upload an eye image first so I have context to answer your question." });
+      return;
     }
+    if (flowStep === "name") {
+
+  setPatientName(question);
+
+await apiFetch("/api/patient-name", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    session_id: analysisCtx.session_id,
+    patient_name: question,
+  }),
+});
+
+const updatedSessions = await apiFetch("/api/sessions");
+setSessions(updatedSessions);
+
+  addMessage({
+    role: "user",
+    text: question
+  });
+
+  addMessage({
+    role: "bot",
+    text: "Please enter your preferred language."
+  });
+
+  setInput("");
+  setFlowStep("language");
+
+  return;
+}
+
+    if (flowStep === "language") {
+
+  setSelectedLanguage(question);
+
+  addMessage({
+    role: "user",
+    text: question
+  });
+
+  setInput("");
+  setLoading(true);
+
+  await apiFetch("/api/language", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    session_id: analysisCtx.session_id,
+    language: question,
+  }),
+});
+
+  try {
+
+    const assessment = await apiFetch(
+      `/api/assessment/${analysisCtx.session_id}`
+    );
+
+    setAssessmentMode(true);
+    setFlowStep("assessment");
+
+    addMessage({
+      role: "bot",
+      text: assessment.question
+    });
+
+  } catch (err) {
+
+    addMessage({
+      role: "bot",
+      text: `Error: ${err.message}`
+    });
+
+  } finally {
+
+    setLoading(false);
+
   }
 
-  // ── Submit assessment answer (Y/N) ─────────────────────────────────────────
-  async function submitAssessmentAnswer(answer) {
-    if (loading) return;
-    addMessage({ role: "user", text: answer });
-    setLoading(true);
-    try {
-      const data = await apiFetch("/api/assessment", {
+  return;
+}
+if (flowStep === "assessment") {
+
+  addMessage({
+    role: "user",
+    text: question
+  });
+
+  setInput("");
+  setLoading(true);
+
+  try {
+
+    const data = await apiFetch(
+      "/api/assessment",
+      {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ session_id: sessionCtx.session_id, answer }),
-      });
-
-      if (data.completed) {
-        addMessage({
-          role: "bot",
-          text: "Assessment complete! Here's your screening report:",
-          report: data.report,
-          prediction: sessionCtx.prediction,
-          confidence: sessionCtx.confidence,
-        });
-        addMessage({
-          role: "bot",
-          text: "You can now ask me anything about your results — what they mean, what to do next, or anything about eye health.",
-        });
-        setFlowStep("chat");
-      } else {
-        setAssessmentProgress({ current: data.question_number, total: data.total_questions });
-        addMessage({
-          role: "bot",
-          text: `Question ${data.question_number}/${data.total_questions}: ${data.question}`,
-        });
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          session_id: analysisCtx.session_id,
+          answer: question
+        })
       }
-    } catch (err) {
-      addMessage({ role: "bot", text: `Error: ${err.message}` });
-    } finally {
-      setLoading(false);
-    }
-  }
+    );
 
-  // ── Main text submit — routes by flowStep ──────────────────────────────────
-  async function handleTextSubmit() {
-    const text = input.trim();
-    if (!text || loading) return;
-    setInput("");
+    if (data.completed) {
 
-    // ── Name step ──
-    if (flowStep === "ask_name") {
-      addMessage({ role: "user", text });
+      setAssessmentMode(false);
+      setFlowStep("chat");
+
       addMessage({
         role: "bot",
-        text: "Which language would you prefer for the report?\n(e.g. English, Hindi, Marathi, Tamil, Telugu)",
+        text: "Assessment completed."
       });
-      setFlowStep("ask_language");
-      return;
+
+      addMessage({
+        role: "bot",
+        report: data.report,
+        prediction: analysisCtx.prediction,
+        confidence: analysisCtx.confidence
+      });
+
+      addMessage({
+        role: "bot",
+        text: "You may now ask questions about cataract, eye health, symptoms, or your report."
+      });
+
+    } else {
+
+      addMessage({
+        role: "bot",
+        text: data.question
+      });
+
     }
 
-    // ── Language step ──
-    if (flowStep === "ask_language") {
-      addMessage({ role: "user", text });
-      setLoading(true);
-      try {
-        // Update language on backend
-        await apiFetch("/api/session/language", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ session_id: sessionCtx.session_id, language: text }),
-        });
-        addMessage({ role: "bot", text: `Got it! I'll use ${text}. Starting your symptom assessment now…` });
-        setFlowStep("assessment"); // temp, startAssessment will confirm
-        await startAssessment(sessionCtx.session_id);
-      } catch (err) {
-        addMessage({ role: "bot", text: `Error: ${err.message}` });
-        setLoading(false);
-      }
-      return;
-    }
+  } catch (err) {
 
-    // ── Assessment step — only Y/N via buttons, but allow typing too ──
-    if (flowStep === "assessment") {
-      const upper = text.toUpperCase();
-      if (upper !== "Y" && upper !== "N") {
-        addMessage({ role: "user", text });
-        addMessage({ role: "bot", text: "Please reply with Y (Yes) or N (No), or use the buttons below." });
-        return;
-      }
-      await submitAssessmentAnswer(upper);
-      return;
-    }
+    addMessage({
+      role: "bot",
+      text: `Error: ${err.message}`
+    });
 
-    // ── Chat step ──
-    if (flowStep === "chat") {
-      addMessage({ role: "user", text });
-      setLoading(true);
-      try {
-        const data = await apiFetch("/api/chat", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question: text, session_id: sessionCtx.session_id }),
-        });
-        addMessage({ role: "bot", text: data.answer });
-      } catch (err) {
-        addMessage({ role: "bot", text: `Error: ${err.message}` });
-      } finally {
-        setLoading(false);
-      }
-      return;
+  } finally {
+
+    setLoading(false);
+
+  }
+
+  return;
+}
+
+    setInput("");
+    addMessage({ role: "user", text: question });
+    setLoading(true);
+
+    try {
+      const data = await apiFetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question, session_id: analysisCtx.session_id}),
+      });
+      addMessage({ role: "bot", text: data.answer });
+    } catch (err) {
+      addMessage({ role: "bot", text: `Error: ${err.message}` });
+    } finally {
+      setLoading(false);
     }
   }
 
   function handleKey(e) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleTextSubmit();
+      handleSend();
     }
   }
 
@@ -850,12 +1099,16 @@ function ChatScreen({ user, onLogout }) {
     clearToken();
     onLogout();
   }
-
-  const isInputDisabled = loading || flowStep === "upload";
-  const isSendDisabled = loading || !input.trim() || flowStep === "upload";
-  const isUploadDisabled = loading || flowStep !== "upload";
-  const showQuickReplies = flowStep === "assessment" && !loading;
-  const showProgressBar = flowStep === "assessment";
+const filteredSessions = [...sessions]
+  .sort(
+    (a, b) =>
+      new Date(b.created_at) - new Date(a.created_at)
+  )
+  .filter(session =>
+    (session.title || "")
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase())
+  );
 
   return (
     <div className="shell">
@@ -864,57 +1117,128 @@ function ChatScreen({ user, onLogout }) {
         <div className="header-left">
           <div className="header-icon">👁️</div>
           <div>
-            <div className="header-title">EyeCare Assistant</div>
+            <div className="header-title">EyeScan Assistant</div>
             <div className="header-sub">AI-powered cataract screening</div>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <StepDots flowStep={flowStep} />
-          <button className="btn-logout" onClick={handleLogout}>Sign out</button>
-        </div>
+        <button className="btn-logout" onClick={handleLogout}>Sign out</button>
       </div>
-
-      {/* Assessment progress bar */}
-      {showProgressBar && (
-        <div className="assessment-bar-wrap">
-          <div className="assessment-bar-label">
-            Symptom assessment — question {assessmentProgress.current} of {assessmentProgress.total}
-          </div>
-          <div className="assessment-bar-track">
-            <div
-              className="assessment-bar-fill"
-              style={{ width: `${(assessmentProgress.current / assessmentProgress.total) * 100}%` }}
-            />
-          </div>
-        </div>
-      )}
 
       {/* Messages */}
-      <div className="messages">
-        {messages.map((msg, i) => <Message key={i} msg={msg} />)}
-        {loading && <TypingBubble />}
-        <div ref={bottomRef} />
-      </div>
+      <div className="main-content">
 
-      {/* Y / N quick reply buttons during assessment */}
-      {showQuickReplies && (
-        <div className="quick-replies">
+          {/* Session Sidebar */}
+          <div className="session-sidebar">
+
           <button
-            className="quick-reply-btn"
-            onClick={() => submitAssessmentAnswer("Y")}
-            disabled={loading}
+            className="new-chat-btn"
+            onClick={createNewSession}
           >
-            Yes
+            + New Assessment
           </button>
-          <button
-            className="quick-reply-btn"
-            onClick={() => submitAssessmentAnswer("N")}
-            disabled={loading}
-          >
-            No
-          </button>
+          <input
+          type="text"
+          placeholder="🔍 Search patient..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="search-input"
+        />
+        <div className="session-header">
+            Recents
+          </div>
+
+      {filteredSessions.map(session => (
+      <div
+  key={session.session_id}
+  className={
+    activeSession === session.session_id
+      ? "session-item active"
+      : "session-item"
+  }
+>
+
+  <div
+    onClick={() => loadSession(session.session_id)}
+    style={{
+      cursor: "pointer"
+    }}
+  >
+    <div>
+      {session.title || "New Assessment"}
+    </div>
+
+    <small>
+      {session.prediction}
+    </small>
+  </div>
+
+  <button
+    onClick={(e) => {
+    e.stopPropagation();
+
+    if (window.confirm("Delete this session?")) {
+      deleteSession(session.session_id);
+    }
+  }}
+    style={{
+  marginTop: "4px",
+  padding: "2px 6px",
+  border: "none",
+  background: "#fff0f0",
+  borderRadius: "6px",
+  cursor: "pointer",
+  fontSize: "11px",
+  color: "#dc2626",
+  alignSelf: "flex-end"
+}}
+  >
+    🗑 Delete
+  </button>
+
+</div>
+        ))}
         </div>
-      )}
+
+        {/* Messages */}
+        <div className="chat-area">
+        <div className="messages">
+          <div className="messages-inner">
+          {flowStep === "upload" && !analysisCtx ? (
+            <div className="upload-prompt">
+              <div className="upload-prompt-icon">👁️</div>
+              <div style={{ fontSize: "16px", fontWeight: "600", color: "#1a1a2e" }}>
+                Hi there! I'm your EyeScan Assistant.
+              </div>
+              <div style={{ color: "#6b7280", fontSize: "13px" }}>
+                Upload an eye image to begin cataract screening.
+              </div>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                ref={fileRef}
+                style={{ display: "none" }}
+                onChange={handleUpload}
+              />
+              <button
+                className="btn-primary"
+                style={{ maxWidth: "220px" }}
+                onClick={() => fileRef.current?.click()}
+              >
+                Upload Eye Image
+              </button>
+            </div>
+          ) : (
+            <>
+              {messages.map((msg, i) => (
+                <Message key={i} msg={msg} />
+              ))}
+              {loading && <TypingBubble />}
+              <div ref={bottomRef} />
+            </>
+          )}
+          </div>
+
+          </div>
 
       {/* Disclaimer */}
       <div className="disclaimer">
@@ -922,57 +1246,53 @@ function ChatScreen({ user, onLogout }) {
       </div>
 
       {/* Input bar */}
-      <div className="input-bar">
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp"
-          ref={fileRef}
-          style={{ display: "none" }}
-          onChange={handleUpload}
-        />
-        <button
-          className="btn-upload"
-          title="Upload eye image"
-          onClick={() => fileRef.current?.click()}
-          disabled={isUploadDisabled}
-        >
-          📎
-        </button>
-        <textarea
-          ref={textareaRef}
-          rows={1}
-          placeholder={
-            flowStep === "upload" ? "Upload an image to start…"
-            : flowStep === "ask_name" ? "Enter your name…"
-            : flowStep === "ask_language" ? "Enter preferred language…"
-            : flowStep === "assessment" ? "Type Y or N, or use the buttons above…"
-            : "Ask about your results…"
-          }
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={handleKey}
-          disabled={isInputDisabled}
-        />
-        <button
-          className="btn-send"
-          onClick={handleTextSubmit}
-          disabled={isSendDisabled}
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1a1a2e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="22" y1="2" x2="11" y2="13" />
-            <polygon points="22 2 15 22 11 13 2 9 22 2" />
-          </svg>
-        </button>
-      </div>
+      {analysisCtx && (
+        <div className="input-bar">
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            ref={fileRef}
+            style={{ display: "none" }}
+            onChange={handleUpload}
+          />
+
+
+    <textarea
+      ref={textareaRef}
+      rows={1}
+      placeholder="Type your message..."
+      value={input}
+      onChange={e => setInput(e.target.value)}
+      onKeyDown={handleKey}
+      disabled={loading}
+    />
+
+    <button
+      className="btn-send"
+      onClick={handleSend}
+      disabled={loading || !input.trim()}
+    >
+      ➤
+    </button>
+  </div>
+
+)}
+
+</div>
+
+</div>
+
     </div>
   );
 }
+
 
 // ── Root ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
   const [user, setUser] = useState(null);
 
+  // Auto-login if token exists
   useEffect(() => {
     const token = getToken();
     if (token) {
