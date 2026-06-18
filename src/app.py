@@ -541,9 +541,9 @@ def submit_assessment(current_user):
             403
         )
 
-    if answer not in ["Y", "N"]:
+    if answer not in ["YES", "NO"]:
         return error_response(
-            "Answer must be Y or N.",
+            "Answer must be Yes or No.",
             400
         )
 
@@ -567,7 +567,7 @@ def submit_assessment(current_user):
     except Exception:
         symptoms = []
 
-    if answer == "Y":
+    if answer == "YES":
         symptoms.append(
             question_data["symptom"]
         )
