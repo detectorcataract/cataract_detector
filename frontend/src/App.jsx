@@ -78,9 +78,9 @@ const styles = `
   }
 
   .auth-logo-icon {
-    width: 36px;
-    height: 36px;
-    background: #bdd7ff;
+    width: 60px;
+    height: 60px;
+    background: white;
     border-radius: 10px;
     display: flex;
     align-items: center;
@@ -88,8 +88,8 @@ const styles = `
     font-size: 18px;
   }
 .auth-logo-icon img {
-  width: 40px;
-  height: 40px;
+  width: 60px;
+  height: 60px;
   object-fit: contain;
 }
 .auth-logo-icon {
@@ -210,27 +210,7 @@ const styles = `
   right: -120px;
   filter: blur(40px);
 }
-.arc-1 {
-  position: absolute;
-  width: 700px;
-  height: 700px;
-  border: 45px solid #93c5fd;
-  border-radius: 50%;
-  top: -450px;
-  left: -450px;
-  pointer-events: none;
-}
 
-.arc-2 {
-  position: absolute;
-  width: 550px;
-  height: 550px;
-  border: 35px solid #60a5fa;
-  border-radius: 50%;
-  bottom: -300px;
-  right: -300px;
-  pointer-events: none;
-}
 
   .error-msg {
     background: #fff0f0;
@@ -242,27 +222,52 @@ const styles = `
   }
 
   /* ── App Shell ── */
-  .shell {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    width: 100%;
-    background: #fff;
-  }
-
-  /* ── Header ── */
-  .header {
+.shell {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 24px;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+  background: #fff;
 
-  background: #bdd7ff;
-  border-bottom: none;
-
-  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
 }
 
+  /* ── Header ── */
+.header {
+  position: relative;
+
+  background: white;
+  padding: 24px 32px;
+  border-radius: 0 0 40px 40px;
+  overflow: hidden;
+  z-index: 2;
+
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.header,
+.main-content {
+  position: relative;
+  z-index: 1;
+}
+.header::after {
+  content: "";
+  position: absolute;
+
+  width: 800px;
+  height: 800px;
+
+  border: 40px solid #bdd7ff;
+  border-radius: 50%;
+
+  top: -699px;
+  right: -120px;
+
+  pointer-events: none;
+  z-index: 0;
+}
   .header-left {
     display: flex;
     align-items: center;
@@ -270,15 +275,24 @@ const styles = `
   }
 
   .header-icon {
-    width: 34px;
-    height: 34px;
-    background: #bdd7ff;
-    border-radius: 9px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-  }
+  width: 48px;
+  height: 48px;
+
+  border-radius: 12px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  overflow: hidden;
+  background: transparent;
+}
+.header-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
 
   .header-title {
     font-size: 15px;
@@ -291,16 +305,20 @@ const styles = `
   }
 
   .btn-logout {
-    background: none;
-    border: 1.5px solid #e5e7eb;
-    border-radius: 8px;
-    padding: 6px 14px;
-    font-size: 12px;
-    font-family: inherit;
-    color: #6b7280;
-    cursor: pointer;
-    transition: all 0.15s;
-  }
+  background: #d9f99d;
+  color: #365314;
+
+  border: none;
+  border-radius: 10px;
+
+  padding: 10px 18px;
+  font-weight: 600;
+
+  cursor: pointer;
+  position: relative;
+  z-index: 10;
+
+}
 .hero-header {
   display: flex;
   align-items: center;
@@ -331,6 +349,16 @@ const styles = `
   font-size: 18px;
   font-weight: 500;
   color: #000;
+}
+
+
+.theme-btn {
+  width: 42px;
+  height: 42px;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  background: #f3f4f6;
 }
 
 .hero-section p {
@@ -605,28 +633,25 @@ const styles = `
   margin-bottom: 10px;
 }
 .new-chat-btn {
-  width: 100%;
-
+ width: 100%;
   padding: 10px 12px;
 
   border: none;
   border-radius: 10px;
 
   background: #bdd7ff;
-  color: #1a1a2e;
+  color: #000;
 
   font-size: 13px;
   font-weight: 600;
 
   cursor: pointer;
-
-  margin-bottom: 12px;
-
   transition: all 0.2s ease;
 }
 
 .new-chat-btn:hover {
-  background: #a3c8ff;
+
+  background:#d9f99d;
 }
 .search-input {
   width: 100%;
@@ -998,7 +1023,6 @@ function ChatScreen({ user, onLogout }) {
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
   const [activeSession, setActiveSession] = useState(null);
-
   async function loadSession(sessionId) {
   try {
     setMessages([]);        // clear immediately
@@ -1080,7 +1104,7 @@ function createNewSession() {
   setPatientName("");
   setSelectedLanguage("");
   setInput("");
-  setMessages([]);  
+  setMessages([]);
   setSearchTerm("");
 }
 useEffect(() => {
@@ -1128,7 +1152,7 @@ useEffect(() => {
         role: "bot",
         text: "Please enter patient name."
     });
-     
+
 setFlowStep("name");
     } catch (err) {
       addMessage({ role: "bot", text: `Something went wrong: ${err.message}` });
@@ -1345,20 +1369,39 @@ const filteredSessions = [...sessions]
   );
 
   return (
-    <div className="shell">
-      {/* Header */}
-      <div className="header">
-        <div className="header-left">
-          <div className="header-icon">👁️</div>
-          <div>
-            <div className="header-title">EyeScan Assistant</div>
-            <div className="header-sub">AI-powered cataract screening</div>
+  <div className={`shell ${darkMode ? "dark" : ""}`}>
+
+    {/* Header */}
+    <div className="header">
+      <div className="header-left">
+
+        <div className="header-icon">
+          <img
+            src="/eyelogo.jpeg"
+            alt="Eye Logo"
+          />
+        </div>
+
+        <div>
+          <div className="header-title">
+            EyeScan Assistant
+          </div>
+
+          <div className="header-sub">
+            AI-powered cataract screening
           </div>
         </div>
-        <button className="btn-logout" onClick={handleLogout}>Sign out</button>
-      </div>
 
-      {/* Messages */}
+      </div>
+      <button
+        className="btn-logout"
+        onClick={handleLogout}
+      >
+        Sign out
+      </button>
+    </div>
+
+
       <div className="main-content">
 
           {/* Session Sidebar */}
