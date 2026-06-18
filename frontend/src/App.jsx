@@ -252,14 +252,16 @@ const styles = `
 
   /* ── Header ── */
   .header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px 24px;
-    border-bottom: 1.5px solid #e8f0fe;
-    background: #fff;
-    flex-shrink: 0;
-  }
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+
+  background: #bdd7ff;
+  border-bottom: none;
+
+  flex-shrink: 0;
+}
 
   .header-left {
     display: flex;
@@ -577,7 +579,7 @@ const styles = `
   background: #fafcff;
 
   scrollbar-width: thin; /* Firefox */
-  scrollbar-color: #bdd7ff transparent;
+  scrollbar-color: #fff transparent;
 }
 
 .session-sidebar::-webkit-scrollbar {
@@ -589,8 +591,12 @@ const styles = `
 }
 
 .session-sidebar::-webkit-scrollbar-thumb {
-  background: #bdd7ff;
+  background: #fffs;
   border-radius: 10px;
+}
+.session-sidebar {
+  background: #bdd7ff;
+  border-right: none;
 }
 
 .session-header {
