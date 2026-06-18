@@ -8,6 +8,7 @@ from PIL import Image, UnidentifiedImageError
 
 from flask import Flask, jsonify, request, send_from_directory, url_for
 from werkzeug.utils import secure_filename
+from werkzeug.middleware.proxy_fix import ProxyFix
 from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -28,6 +29,7 @@ from gemini_helper import ask_question, generate_report, translate_text, ASSESSM
 from predict import predict_cataract  # noqa: E402
 
 app = Flask(__name__)
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
 app.config["UPLOAD_FOLDER"] = str(UPLOAD_DIR)
@@ -142,6 +144,7 @@ def analyze_image(current_user):
         image_url=url_for(
             "uploaded_file",
             filename=stored_filename,
+            _external=True,
         ),
         patient_name=None,
     )
