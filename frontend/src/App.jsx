@@ -560,7 +560,7 @@ const styles = `
   .btn-send {
     width: 42px;
     height: 42px;
-    background: #bdd7ff;
+    background:#d9f99d ;
     border: none;
     border-radius: 12px;
     cursor: pointer;
@@ -571,7 +571,7 @@ const styles = `
     transition: background 0.15s;
   }
 
-  .btn-send:hover { background: #a3c8ff; }
+  .btn-send:hover { background: #bef264; }
   .btn-send:disabled { opacity: 0.5; cursor: not-allowed; }
 
 
@@ -1097,7 +1097,7 @@ function ChatScreen({ user, onLogout }) {
   }
 }
 function createNewSession() {
-  setActiveSession(null);
+  setActiveSession(null);dark
   setAnalysisCtx(null);
   setAssessmentMode(false);
   setFlowStep("upload");
@@ -1369,7 +1369,7 @@ const filteredSessions = [...sessions]
   );
 
   return (
-  <div className={`shell ${darkMode ? "dark" : ""}`}>
+  <div className="shell">
 
     {/* Header */}
     <div className="header">
