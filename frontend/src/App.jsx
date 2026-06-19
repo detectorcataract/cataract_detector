@@ -367,7 +367,11 @@ const styles = `
   color: #4b5563;
 }
 
-  .btn-logout:hover { border-color: #bdd7ff; color: #1a1a2e; }
+  .btn-logout:hover {
+  background: #fca5a5;
+  border-color: #fca5a5;
+  color: #7f1d1d;
+}
 
   /* ── Messages ── */
   .messages {
@@ -560,7 +564,7 @@ const styles = `
   .btn-send {
     width: 42px;
     height: 42px;
-    background:#d9f99d ;
+    background:#bef264 ;
     border: none;
     border-radius: 12px;
     cursor: pointer;
@@ -571,7 +575,7 @@ const styles = `
     transition: background 0.15s;
   }
 
-  .btn-send:hover { background: #bef264; }
+  .btn-send:hover { background: #d9f99d; }
   .btn-send:disabled { opacity: 0.5; cursor: not-allowed; }
 
 
@@ -1097,7 +1101,7 @@ function ChatScreen({ user, onLogout }) {
   }
 }
 function createNewSession() {
-  setActiveSession(null);dark
+  setActiveSession(null);
   setAnalysisCtx(null);
   setAssessmentMode(false);
   setFlowStep("upload");
@@ -1120,6 +1124,75 @@ useEffect(() => {
   function addMessage(msg) {
     setMessages(prev => [...prev, msg]);
   }
+  async function handleAssessmentAnswer(answer) {
+
+  addMessage({
+    role: "user",
+    text: answer
+  });
+
+  setLoading(true);
+
+  try {
+
+    const data = await apiFetch(
+      "/api/assessment",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          session_id: analysisCtx.session_id,
+          answer
+        })
+      }
+    );
+
+    if (data.completed) {
+
+      setAssessmentMode(false);
+      setFlowStep("chat");
+
+      addMessage({
+        role: "bot",
+        text: "Assessment completed."
+      });
+
+      addMessage({
+        role: "bot",
+        report: data.report,
+        prediction: analysisCtx.prediction,
+        confidence: analysisCtx.confidence
+      });
+
+      addMessage({
+        role: "bot",
+        text: "You may now ask questions about cataract, eye health, symptoms, or your report."
+      });
+
+    } else {
+
+      addMessage({
+        role: "bot",
+        text: data.question
+      });
+
+    }
+
+  } catch (err) {
+
+    addMessage({
+      role: "bot",
+      text: `Error: ${err.message}`
+    });
+
+  } finally {
+
+    setLoading(false);
+
+  }
+}
 
   async function handleUpload(e) {
     const file = e.target.files?.[0];
@@ -1524,35 +1597,53 @@ const filteredSessions = [...sessions]
 
       {/* Input bar */}
       {analysisCtx && (
-        <div className="input-bar">
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            ref={fileRef}
-            style={{ display: "none" }}
-            onChange={handleUpload}
-          />
-
-
-    <textarea
-      ref={textareaRef}
-      rows={1}
-      placeholder="Type your message..."
-      value={input}
-      onChange={e => setInput(e.target.value)}
-      onKeyDown={handleKey}
-      disabled={loading}
+  <div className="input-bar">
+    <input
+      type="file"
+      accept="image/jpeg,image/png,image/webp"
+      ref={fileRef}
+      style={{ display: "none" }}
+      onChange={handleUpload}
     />
 
-    <button
-      className="btn-send"
-      onClick={handleSend}
-      disabled={loading || !input.trim()}
-    >
-      ➤
-    </button>
+    {flowStep === "assessment" ? (
+      <div style={{ display: "flex", gap: "12px", width: "100%" }}>
+        <button
+          className="btn-primary"
+          onClick={() => handleAssessmentAnswer("Yes")}
+          disabled={loading}
+        >
+          Yes
+        </button>
+        <button
+          className="btn-primary"
+          onClick={() => handleAssessmentAnswer("No")}
+          disabled={loading}
+        >
+          No
+        </button>
+      </div>
+    ) : (
+      <>
+        <textarea
+          ref={textareaRef}
+          rows={1}
+          placeholder="Type your message..."
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={handleKey}
+          disabled={loading}
+        />
+        <button
+          className="btn-send"
+          onClick={handleSend}
+          disabled={loading || !input.trim()}
+        >
+          ➤
+        </button>
+      </>
+    )}
   </div>
-
 )}
 
 </div>
