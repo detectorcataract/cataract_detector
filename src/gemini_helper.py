@@ -1,6 +1,8 @@
 import os
 from dotenv import load_dotenv
 from google import genai
+import json
+from google.genai import types
 
 load_dotenv()
 
@@ -59,32 +61,39 @@ Always remind users:
 This platform is intended for screening and educational purposes only.
 Please consult an ophthalmologist for professional evaluation.
 """
-def get_client():
-    global client
+def load_key_pool() -> list[str]:
+    keys = []
+    index = 1
+    while True:
+        key = os.getenv(f"GEMINI_API_KEY_{index}", "").strip()
+        if not key:
+            break
+        keys.append(key)
+        index += 1
+    if not keys:
+        raise ValueError("No Gemini API keys found. Add GEMINI_API_KEY_1, GEMINI_API_KEY_2 … to your .env")
+    return keys
 
-    if client is None:
-        api_key = os.getenv("GEMINI_API_KEY")
+KEY_POOL: list[str] = load_key_pool()
+FAILED_INDICES: set[int] = set()
 
-        if not api_key:
-            raise ValueError(
-                "GEMINI_API_KEY not found in .env file"
-            )
+def generate_with_failover(build_request_fn):
+    global FAILED_INDICES
 
-        client = genai.Client(api_key=api_key)
+    for index, api_key in enumerate(KEY_POOL):
+        if index in FAILED_INDICES:
+            continue
+        try:
+            client = genai.Client(api_key=api_key)
+            return build_request_fn(client)
+        except Exception as exc:
+            FAILED_INDICES.add(index)
+            continue
 
-    return client
+    raise RuntimeError("All Gemini API keys have failed for this session.")
 
 def is_eye_image(image_path) -> dict:
-    """
-    Validates whether the uploaded image is a close-up eye photo suitable
-    for cataract screening. Returns {'is_eye': bool, 'reason': str}.
-    """
-    import json
-    from google.genai import types
-
     try:
-        gemini_client = get_client()
-
         with open(image_path, "rb") as f:
             image_bytes = f.read()
 
@@ -105,14 +114,17 @@ def is_eye_image(image_path) -> dict:
             '{"is_eye": true or false, "reason": "one short sentence explaining why"}'
         )
 
-        response = gemini_client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=[
-                prompt,
-                types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
-            ],
-            config=GENERATION_CONFIG,
-        )
+        def build(client):
+            return client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=[
+                    prompt,
+                    types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+                ],
+                config=GENERATION_CONFIG,
+            )
+
+        response = generate_with_failover(build)
 
         text = response.text.strip()
 
@@ -146,11 +158,14 @@ def translate_text(text, language):
     {text}
     """
 
-    response = get_client().models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt,
-        config=GENERATION_CONFIG
-    )
+    def build(client):
+        return client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config=GENERATION_CONFIG,
+        )
+
+    response = generate_with_failover(build)
 
     return (
         response.text.strip()
@@ -229,11 +244,14 @@ def generate_report(
 
     try:
 
-        response = get_client().models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config=GENERATION_CONFIG,
-        )
+        def build(client):
+            return client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config=GENERATION_CONFIG,
+            )
+
+        response = generate_with_failover(build)
 
         if response.text:
             return response.text
@@ -320,11 +338,14 @@ def ask_question(
 
     try:
 
-        response = get_client().models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config=GENERATION_CONFIG
-        )
+        def build(client):
+            return client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config=GENERATION_CONFIG,
+            )
+
+        response = generate_with_failover(build)
 
         if response.text:
             return response.text
