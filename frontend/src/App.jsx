@@ -1353,7 +1353,7 @@ useEffect(() => {
       console.error("handleAnalyze failed:", err);
       addMessage({
         role: "bot",
-        text: `Something went wrong analyzing your image: ${err.message}`
+        text: err.message
       });
     } finally {
       setAnalyzing(false);
