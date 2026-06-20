@@ -25,7 +25,7 @@ MAX_CONTENT_LENGTH = 8 * 1024 * 1024
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from gemini_helper import ask_question, generate_report, translate_text, ASSESSMENT_QUESTIONS  # noqa: E402
+from gemini_helper import ask_question, generate_report, translate_text, is_eye_image, ASSESSMENT_QUESTIONS   # noqa: E402
 from predict import predict_cataract  # noqa: E402
 
 app = Flask(__name__)
@@ -102,7 +102,7 @@ def analyze_image(current_user):
 
     try:
         with Image.open(image_path) as img:
-            img.verify()  # catches corrupted/non-image files
+            img.verify()
     except (UnidentifiedImageError, Exception):
         image_path.unlink(missing_ok=True)  # clean up the saved file
         return error_response("Uploaded file is not a valid image.", 400)
@@ -115,6 +115,15 @@ def analyze_image(current_user):
     except Exception:
         image_path.unlink(missing_ok=True)
         return error_response("Could not read the uploaded image.", 400)
+
+    eye_check = is_eye_image(image_path)
+    if not eye_check["is_eye"]:
+        image_path.unlink(missing_ok=True)
+        return error_response(
+            f"This doesn't look like a valid eye image. {eye_check['reason']} "
+            "Please upload a clear close-up photo of an eye.",
+            400
+        )
 
     try:
         prediction_result = predict_cataract(image_path)
