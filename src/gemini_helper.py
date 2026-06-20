@@ -74,6 +74,61 @@ def get_client():
 
     return client
 
+def is_eye_image(image_path) -> dict:
+    """
+    Validates whether the uploaded image is a close-up eye photo suitable
+    for cataract screening. Returns {'is_eye': bool, 'reason': str}.
+    """
+    import json
+    from google.genai import types
+
+    try:
+        gemini_client = get_client()
+
+        with open(image_path, "rb") as f:
+            image_bytes = f.read()
+
+        suffix = str(image_path).rsplit(".", 1)[-1].lower()
+        mime_map = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp"}
+        mime_type = mime_map.get(suffix, "image/jpeg")
+
+        prompt = (
+            "You are a strict image validator for a medical eye-screening app. "
+            "Carefully examine this image. It must show a clear, detailed, in-focus "
+            "close-up photograph of a human eye with visible iris, pupil, and surrounding "
+            "eye structures — suitable for clinical cataract screening. "
+            "REJECT (is_eye: false) if the image is: blank, solid color, white, black, "
+            "too dark, too bright, blurry, a screenshot, text, a random object, an animal, "
+            "a full face without eye close-up detail, or anything that is not unambiguously "
+            "a detailed human eye photo. "
+            "If rejecting, the reason must be a short, friendly message telling the user "
+            "to start a new assessment and upload a clear close-up eye photo. "
+            "Respond with ONLY a raw JSON object, no markdown, no code fences:\n"
+            '{"is_eye": true or false, "reason": "short message here"}'
+        )
+
+        response = gemini_client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=[
+                prompt,
+                types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+            ],
+            config=GENERATION_CONFIG,
+        )
+
+        text = response.text.strip()
+
+        text = text.replace("```json", "").replace("```", "").strip()
+        result = json.loads(text)
+
+        return {
+            "is_eye": bool(result.get("is_eye", False)),
+            "reason": str(result.get("reason", "")),
+        }
+
+    except Exception as exc:
+        return {"is_eye": True, "reason": "Validation skipped due to an internal error."}
+
 def translate_text(text, language):
 
     if not language or language.lower() == "english":
