@@ -344,11 +344,11 @@ const styles = `
   font-weight: 500;
   color: #64748b;
 }
-.hero-header h4{
-  margin-top: 6px;
-  font-size: 18px;
-  font-weight: 500;
-  color: #000;
+.hero-section h4 {
+  margin-top: 10px;
+  font-size: 24px;
+  font-weight: 600;
+  color: #1a1a2e;
 }
 
 
@@ -447,6 +447,51 @@ const styles = `
     border-radius: 10px;
     margin-bottom: 8px;
     display: block;
+  }
+  .image-preview-card {
+  position: relative;
+  width: auto;
+  max-width: 320px;
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+  .preview-image {
+   max-width: 320px;
+   max-height: 320px;
+   width: auto;
+   height: auto;
+   object-fit: contain;
+   border-radius: 16px;
+   border: 2px solid #bdd7ff;
+   background: #f0f6ff;
+  }
+
+  .remove-preview-btn {
+   position: absolute;
+   top: -8px;
+   right: -8px;
+   width: 28px;
+   height: 28px;
+   border: none;
+   border-radius: 50%;
+   background: white;
+   box-shadow: 0 2px 8px rgba(0,0,0,.2);
+   cursor: pointer;
+   font-size: 16px;
+   color: #1a1a2e;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   line-height: 1;
+   padding: 0;
+  }
+
+  .remove-preview-btn:hover {
+   background: #fff0f0;
+   color: #dc2626;
   }
 
   /* ── Report card ── */
@@ -666,10 +711,12 @@ const styles = `
   font-size: 13px;
   outline: none;
   background: white;
+  color: #1f2937;
+  caret-color: #1f2937;
 }
 
-.search-input:focus {
-  border-color: #bdd7ff;
+.search-input::placeholder {
+  color: #6b7280;
 }
 
 .session-item {
@@ -711,6 +758,43 @@ const styles = `
   min-width: 0;
 }
 
+  /* ── Preview Modal ── */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(26, 26, 46, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 24px;
+  }
+
+  .modal-card {
+    background: #fff;
+    border-radius: 20px;
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 12px 48px rgba(0,0,0,0.25);
+    max-width: 320px;
+    width: 100%;
+  }
+
+  .modal-card h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1a1a2e;
+    text-align: center;
+  }
+
+  .modal-card .btn-primary {
+    width: 100%;
+  }
+
+
 `;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -745,16 +829,30 @@ function clearToken() { localStorage.removeItem("eyecare_token"); }
 
 async function apiFetch(path, options = {}) {
   const token = getToken();
-  const res = await fetch(`${API}${path}`, {
-    ...options,
-    headers: {
-      ...(options.headers || {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
-  const data = await res.json();
 
-  if (!res.ok) throw new Error(data.error || "Something went wrong.");
+  let res;
+  try {
+    res = await fetch(`${API}${path}`, {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+  } catch (networkErr) {
+    console.error("Network error calling", path, networkErr);
+    throw new Error(`Network error: could not reach ${API}${path}. Is the API running and is VITE_API_URL correct?`);
+  }
+
+  let data;
+  try {
+    data = await res.json();
+  } catch (parseErr) {
+    console.error("Non-JSON response from", path, "status:", res.status);
+    throw new Error(`Server returned an unexpected response (status ${res.status}) for ${path}.`);
+  }
+
+  if (!res.ok) throw new Error(data.error || `Request failed (status ${res.status}).`);
   return data;
 }
 
@@ -1027,6 +1125,10 @@ function ChatScreen({ user, onLogout }) {
   const bottomRef = useRef(null);
   const textareaRef = useRef(null);
   const [activeSession, setActiveSession] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [previewImage, setPreviewImage] = useState(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   async function loadSession(sessionId) {
   try {
     setMessages([]);        // clear immediately
@@ -1194,25 +1296,44 @@ useEffect(() => {
   }
 }
 
-  async function handleUpload(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = "";
+  function handleAnalyze() {
+  if (!selectedFile) return;
 
-    const validationError = validateImageFile(file);
-    if (validationError) {
-      addMessage({ role: "bot", text: validationError });
-      return;
-    }
+  const fileToAnalyze = selectedFile;
+  const imageToShow = previewImage;
 
-    const imageUrl = URL.createObjectURL(file);
-    addMessage({ role: "user", imageUrl, text: "Here's my eye image." });
-    setLoading(true);
+  // Leave the modal and jump straight to the chat screen immediately.
+  setShowPreviewModal(false);
+  setAnalyzing(true);
+  setLoading(true);
 
+  addMessage({
+    role: "user",
+    imageUrl: imageToShow,
+    text: "Here's my eye image."
+  });
+
+  addMessage({
+    role: "bot",
+    text: "Analyzing your eye image…"
+  });
+
+  setSelectedFile(null);
+  setPreviewImage(null);
+
+  // Run the actual API call in the background — UI is already on chat screen.
+  (async () => {
     try {
       const form = new FormData();
-      form.append("image", file);
-      const data = await apiFetch("/api/analyze", { method: "POST", body: form });
+      form.append("image", fileToAnalyze);
+
+      const data = await apiFetch(
+        "/api/analyze",
+        {
+          method: "POST",
+          body: form,
+        }
+      );
 
       setAnalysisCtx({
         analysis_id: data.analysis_id,
@@ -1221,18 +1342,61 @@ useEffect(() => {
         confidence: data.confidence,
       });
 
-     addMessage({
+      addMessage({
         role: "bot",
         text: "Please enter patient name."
-    });
+      });
 
-setFlowStep("name");
+      setFlowStep("name");
+
     } catch (err) {
-      addMessage({ role: "bot", text: `Something went wrong: ${err.message}` });
+      console.error("handleAnalyze failed:", err);
+      addMessage({
+        role: "bot",
+        text: `Something went wrong analyzing your image: ${err.message}`
+      });
     } finally {
+      setAnalyzing(false);
       setLoading(false);
     }
+  })();
+}
+ function handleFileSelect(e) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  const validationError =
+    validateImageFile(file);
+
+  if (validationError) {
+    addMessage({
+      role: "bot",
+      text: validationError
+    });
+    return;
   }
+
+  setSelectedFile(file);
+  setPreviewImage(URL.createObjectURL(file)
+  );
+  setShowPreviewModal(true);
+
+
+  e.target.value = "";
+}
+ function removeSelectedImage() {
+  if (previewImage) {
+    URL.revokeObjectURL(previewImage);
+  }
+
+  setSelectedFile(null);
+  setPreviewImage(null);
+  setShowPreviewModal(false);
+
+  if (fileRef.current) {
+    fileRef.current.value = "";
+  }
+}
 
   async function handleSend() {
     console.log("flowStep =", flowStep);
@@ -1444,6 +1608,37 @@ const filteredSessions = [...sessions]
   return (
   <div className="shell">
 
+    {showPreviewModal && selectedFile && (
+      <div className="modal-overlay">
+        <div className="modal-card">
+          <h3>Preview your eye image</h3>
+
+          <div className="image-preview-card">
+            <img
+              src={previewImage}
+              className="preview-image"
+              alt="preview"
+            />
+
+            <button
+              className="remove-preview-btn"
+              onClick={removeSelectedImage}
+            >
+              ✕
+            </button>
+          </div>
+
+          <button
+            className="btn-primary"
+            onClick={handleAnalyze}
+            disabled={loading}
+          >
+            {loading ? "Analyzing…" : "Analyze Image"}
+          </button>
+        </div>
+      </div>
+    )}
+
     {/* Header */}
     <div className="header">
       <div className="header-left">
@@ -1461,7 +1656,7 @@ const filteredSessions = [...sessions]
           </div>
 
           <div className="header-sub">
-            AI-powered cataract screening
+            Empowering Accessible Eye Care
           </div>
         </div>
 
@@ -1553,7 +1748,7 @@ const filteredSessions = [...sessions]
         <div className="chat-area">
         <div className="messages">
           <div className="messages-inner">
-          {flowStep === "upload" && !analysisCtx ? (
+          {flowStep === "upload" && !analysisCtx && messages.length === 0 ? (
             <div className="upload-prompt">
               <div className="upload-prompt-icon">👁️</div>
               <div style={{ fontSize: "16px", fontWeight: "600", color: "#1a1a2e" }}>
@@ -1567,11 +1762,10 @@ const filteredSessions = [...sessions]
                 accept="image/jpeg,image/png,image/webp"
                 ref={fileRef}
                 style={{ display: "none" }}
-                onChange={handleUpload}
+                onChange={handleFileSelect}
               />
               <button
                 className="btn-primary"
-                style={{ maxWidth: "220px" }}
                 onClick={() => fileRef.current?.click()}
               >
                 Upload Eye Image
@@ -1579,12 +1773,12 @@ const filteredSessions = [...sessions]
             </div>
           ) : (
             <>
-              {messages.map((msg, i) => (
-                <Message key={i} msg={msg} />
-              ))}
-              {loading && <TypingBubble />}
-              <div ref={bottomRef} />
-            </>
+            {messages.map((msg, i) => (
+              <Message key={i} msg={msg} />
+            ))}
+            {loading && <TypingBubble />}
+            <div ref={bottomRef} />
+          </>
           )}
           </div>
 
@@ -1596,14 +1790,14 @@ const filteredSessions = [...sessions]
       </div>
 
       {/* Input bar */}
-      {analysisCtx && (
+{analysisCtx && (
   <div className="input-bar">
     <input
       type="file"
       accept="image/jpeg,image/png,image/webp"
       ref={fileRef}
       style={{ display: "none" }}
-      onChange={handleUpload}
+      onChange={handleFileSelect}
     />
 
     {flowStep === "assessment" ? (
@@ -1635,16 +1829,18 @@ const filteredSessions = [...sessions]
           disabled={loading}
         />
         <button
+
           className="btn-send"
           onClick={handleSend}
           disabled={loading || !input.trim()}
         >
-          ➤
-        </button>
+      ➤
+    </button>
       </>
     )}
   </div>
 )}
+
 
 </div>
 
