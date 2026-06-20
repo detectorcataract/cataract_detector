@@ -121,7 +121,7 @@ def analyze_image(current_user):
         image_path.unlink(missing_ok=True)
         return error_response(
             f"This doesn't look like a valid eye image. {eye_check['reason']} "
-            "Please upload a clear close-up photo of an eye.",
+            "Please upload a clear close-up photo in a new assessment",
             400
         )
 

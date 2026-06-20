@@ -101,10 +101,8 @@ def is_eye_image(image_path) -> dict:
             "too dark, too bright, blurry, a screenshot, text, a random object, an animal, "
             "a full face without eye close-up detail, or anything that is not unambiguously "
             "a detailed human eye photo. "
-            "If rejecting, the reason must be a short, friendly message telling the user "
-            "to start a new assessment and upload a clear close-up eye photo. "
             "Respond with ONLY a raw JSON object, no markdown, no code fences:\n"
-            '{"is_eye": true or false, "reason": "short message here"}'
+            '{"is_eye": true or false, "reason": "one short sentence explaining why"}'
         )
 
         response = gemini_client.models.generate_content(
