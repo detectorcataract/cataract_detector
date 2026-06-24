@@ -21,7 +21,6 @@ const styles = `
   align-items: center;
   justify-content: center;
   background: #f0f6ff;
-  padding: 40px;
 }
 .landing-container {
   width: 100%;
@@ -185,6 +184,7 @@ const styles = `
   background: #f0f6ff;
   position: relative;
   overflow: hidden;
+  padding: 40px;
 }
 
 .auth-wrapper::before {
@@ -197,6 +197,7 @@ const styles = `
   top: -150px;
   left: -150px;
   filter: blur(40px);
+  pointer-events: none;
 }
 
 .auth-wrapper::after {
@@ -209,6 +210,7 @@ const styles = `
   bottom: -120px;
   right: -120px;
   filter: blur(40px);
+  pointer-events: none;
 }
 
 

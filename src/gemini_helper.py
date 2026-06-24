@@ -29,8 +29,6 @@ ASSESSMENT_QUESTIONS = [
     }
 ]
 
-client = None
-
 GENERATION_CONFIG = {
     "temperature": 0.2
 }
