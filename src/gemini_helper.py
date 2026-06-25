@@ -6,6 +6,8 @@ from google.genai import types
 
 load_dotenv()
 
+client = None
+
 ASSESSMENT_QUESTIONS = [
     {
         "symptom": "blurred vision",
@@ -73,22 +75,15 @@ def load_key_pool() -> list[str]:
     return keys
 
 KEY_POOL: list[str] = load_key_pool()
-FAILED_INDICES: set[int] = set()
 
 def generate_with_failover(build_request_fn):
-    global FAILED_INDICES
-
-    for index, api_key in enumerate(KEY_POOL):
-        if index in FAILED_INDICES:
-            continue
+    for api_key in KEY_POOL:
         try:
             client = genai.Client(api_key=api_key)
             return build_request_fn(client)
-        except Exception as exc:
-            FAILED_INDICES.add(index)
+        except Exception:
             continue
-
-    raise RuntimeError("All Gemini API keys have failed for this session.")
+    raise RuntimeError("All Gemini API keys exhausted.")
 
 def is_eye_image(image_path) -> dict:
     try:
