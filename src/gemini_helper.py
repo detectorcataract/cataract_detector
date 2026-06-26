@@ -81,7 +81,8 @@ def generate_with_failover(build_request_fn):
         try:
             client = genai.Client(api_key=api_key)
             return build_request_fn(client)
-        except Exception:
+        except Exception as e:
+            print(f"Key {api_key[:10]}... failed | {type(e).__name__}: {e}")
             continue
     raise RuntimeError("All Gemini API keys exhausted.")
 
