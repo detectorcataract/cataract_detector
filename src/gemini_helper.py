@@ -145,8 +145,9 @@ def is_eye_image(image_path) -> dict:
             "reason": str(result.get("reason", "")),
         }
 
+
     except Exception as exc:
-        return {"is_eye": True, "reason": "Validation skipped due to an internal error."}
+        return {"is_eye": False, "reason": "Validation failed. Please try again."}
 
 def translate_text(text, language):
 

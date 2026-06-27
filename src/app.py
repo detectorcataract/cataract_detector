@@ -138,7 +138,7 @@ def analyze_image(current_user):
         except Exception:
             pass
 
-        return error_response(str(exc), 500)
+        return error_response("Could not analyze the image. Please try again.", 500)
 
     session_id = uuid.uuid4().hex
 
