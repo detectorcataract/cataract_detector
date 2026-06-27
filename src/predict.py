@@ -12,49 +12,48 @@ import numpy as np
 from PIL import Image
 from tensorflow import keras
 from tensorflow.keras.applications.mobilenet_v2 import preprocess_input as mobilenetv2_preprocess
-from tensorflow.keras.applications.resnet50 import preprocess_input as resnet50_preprocess
+from tensorflow.keras.applications.vgg19 import preprocess_input as vgg19_preprocess
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 MODEL_DIR = PROJECT_ROOT / "models"
 
-DEFAULT_RESNET50_MODEL_PATH = Path(
-    os.getenv("RESNET50_MODEL_PATH", MODEL_DIR / "cataract_resnet50.keras")
-)
+DEFAULT_VGG19_MODEL_PATH = Path(
+    os.getenv("VGG19_MODEL_PATH", MODEL_DIR / "cataract_vgg19.keras"))
 DEFAULT_MOBILENETV2_MODEL_PATH = Path(
     os.getenv("MOBILENETV2_MODEL_PATH", MODEL_DIR / "cataract_mobilenetv2.keras")
 )
 DEFAULT_LABELS_PATH = Path(os.getenv("LABELS_PATH", MODEL_DIR / "cataract_labels.json"))
 
 IMG_SIZE = (224, 224)
-PreprocessingMode = Literal["embedded", "resnet50", "mobilenetv2", "none"]
+PreprocessingMode = Literal["embedded", "vgg19", "mobilenetv2", "none"]
 
 
 def predict_cataract(
     image: str | Path | bytes | bytearray | Image.Image | np.ndarray,
-    resnet50_model_path: str | Path = DEFAULT_RESNET50_MODEL_PATH,
+    vgg19_model_path: str | Path = DEFAULT_VGG19_MODEL_PATH,
     mobilenetv2_model_path: str | Path = DEFAULT_MOBILENETV2_MODEL_PATH,
     labels_path: str | Path = DEFAULT_LABELS_PATH,
     *,
-    resnet50_preprocessing: PreprocessingMode = "embedded",
+    vgg19_preprocessing: PreprocessingMode = "embedded",
     mobilenetv2_preprocessing: PreprocessingMode = "embedded",
 ) -> dict[str, Any]:
 
     labels = _load_labels(Path(labels_path))
-    resnet_model = _load_model(Path(resnet50_model_path))
+    vgg19_model = _load_model(Path(vgg19_model_path))
     mobilenet_model = _load_model(Path(mobilenetv2_model_path))
 
     image_batch = _load_image_batch(image)
-    resnet_batch = _preprocess_batch(image_batch, resnet50_preprocessing)
+    vgg19_batch = _preprocess_batch(image_batch, vgg19_preprocessing)
     mobilenet_batch = _preprocess_batch(image_batch, mobilenetv2_preprocessing)
 
-    resnet_probs = _predict_probabilities(resnet_model, resnet_batch, "ResNet50")
+    vgg19_probs = _predict_probabilities(vgg19_model, vgg19_batch, "VGG19")
     mobilenet_probs = _predict_probabilities(mobilenet_model, mobilenet_batch, "MobileNetV2")
 
-    _validate_probabilities(resnet_probs, labels, "ResNet50")
+    _validate_probabilities(vgg19_probs, labels, "VGG19")
     _validate_probabilities(mobilenet_probs, labels, "MobileNetV2")
 
-    ensemble_probs = (resnet_probs + mobilenet_probs) / 2.0
+    ensemble_probs = (vgg19_probs + mobilenet_probs) / 2.0
     class_index = int(np.argmax(ensemble_probs))
     confidence = float(ensemble_probs[class_index])
 
@@ -64,7 +63,7 @@ def predict_cataract(
         "class_index": class_index,
         "probabilities": _probability_map(labels, ensemble_probs),
         "model_probabilities": {
-            "resnet50": _probability_map(labels, resnet_probs),
+            "vgg19": _probability_map(labels, vgg19_probs),
             "mobilenetv2": _probability_map(labels, mobilenet_probs),
         },
     }
@@ -136,13 +135,13 @@ def _preprocess_batch(batch: np.ndarray, mode: PreprocessingMode) -> np.ndarray:
 
     if mode in ("embedded", "none"):
         return batch
-    if mode == "resnet50":
-        return resnet50_preprocess(batch)
+    if mode == "vgg19":
+        return vgg19_preprocess(batch)
     if mode == "mobilenetv2":
         return mobilenetv2_preprocess(batch)
 
     raise ValueError(
-        "preprocessing mode must be one of: 'embedded', 'none', 'resnet50', 'mobilenetv2'"
+        "preprocessing mode must be one of: 'embedded', 'none', 'vgg19', 'mobilenetv2'"
     )
 
 
