@@ -96,16 +96,31 @@ def is_eye_image(image_path) -> dict:
         mime_type = mime_map.get(suffix, "image/jpeg")
 
         prompt = (
-            "You are a strict image validator for a medical eye-screening app. "
-            "Carefully examine this image. It must show a clear, detailed, in-focus "
-            "close-up photograph of a human eye with visible iris, pupil, and surrounding "
-            "eye structures — suitable for clinical cataract screening. "
-            "REJECT (is_eye: false) if the image is: blank, solid color, white, black, "
-            "too dark, too bright, blurry, a screenshot, text, a random object, an animal, "
-            "a full face without eye close-up detail, or anything that is not unambiguously "
-            "a detailed human eye photo. "
+            "You are an image validator for a mobile cataract screening app. "
+            "Your only job is to check if the image is a real human eye photo suitable for screening. "
+            "\n\n"
+            "ACCEPT (is_eye: true) ONLY if:\n"
+            "- The image is a real photograph of a human eye, not drawn or generated\n"
+            "- The eye is the main subject of the image\n"
+            "- Iris, pupil, or white of eye is reasonably visible\n"
+            "- One eye or both eyes in frame is fine\n"
+            "- Phone camera quality is acceptable — slight blur, dim lighting is okay\n"
+            "- Glasses are okay if the eye is still visible through the lens\n"
+            "\n"
+            "REJECT (is_eye: false) if:\n"
+            "- The image is AI generated, illustrated, animated, or digitally drawn\n"
+            "- The image is a cartoon, painting, sketch, emoji, or graphic\n"
+            "- The main subject is a full face or selfie, not an eye close-up\n"
+            "- The image is a random object, food, scenery, animal, screenshot, or text\n"
+            "- No eye is visible at all\n"
+            "- The image is completely black, white, or blank\n"
+            "- The eye is too small in the frame to be assessed\n"
+            "- So blurry or dark that no eye structure can be identified\n"
+            "\n"
+            "The image must be a real photograph of a human eye — not a face photo, "
+            "not a graphic, not AI generated art. "
             "Respond with ONLY a raw JSON object, no markdown, no code fences:\n"
-            '{"is_eye": true or false, "reason": "one short sentence explaining why"}'
+            '{"is_eye": true or false, "reason": "one short sentence"}'
         )
 
         def build(client):

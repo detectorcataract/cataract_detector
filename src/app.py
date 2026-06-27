@@ -355,7 +355,7 @@ def chat(current_user):
     except Exception as exc:
         db.session.rollback()
         return error_response(
-            str(exc),
+            "Something went wrong. Please try again.",
             500
         )
 
